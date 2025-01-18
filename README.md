@@ -21,3 +21,9 @@
 
 1. Go to **Settings** -> **Devices & Services** -> **Add integration**.
 2. Search for "Insnrg" and enter your **Username** and **Password**.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+**Note:** By using this code to access the Insnrg 3rd party API, you agree to Insnrg's Terms and Conditions.
