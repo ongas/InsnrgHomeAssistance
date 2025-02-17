@@ -10,7 +10,7 @@
  <img src="https://github.com/user-attachments/assets/4b954930-9611-4408-a047-09a35a6e01cc" alt="Image">
 </p>
 
-The integration sets up 33 sensors:
+The Insnrg custom integration sets up 33 sensors:
 
 - **SPA**
 - **Filter Mode**
@@ -22,22 +22,20 @@ The integration sets up 33 sensors:
 - **Set Point ORP**
 - **pH Connected**
 - **ORP Connected**
-- **Pool Current Temperature** (or 0 if you don't measure temperature)
+- **Pool Current Temperature**
 - **Outlet data for each of the 3 Vi-Outlets and 4 Hub-Outlets**:
   - Waterfall, Jet Pump, Lights, In Floor, Ozone, Blower
 - **Valve data for each of the 3 Vi-Valves and 4 Hub-Valves**
   - Waterfall, Feature
 - **Timer data for each of the 4 timers**:
-  - Chlorinator (this would be _True_ for the timer controlling your filter pump, so the chlorinator turns on and off)
-  - Enabled (is the timer being used at all)
-
-If you have use cases that require other data to be brought into the integration, feel free to ask, and I'll look into it. I do not intend to allow the integration to make changes to your system, like you can from the app (e.g., changing chemical set points, timers, etc.). If someone else wants to make this a fully-fledged API interface, you are welcome to fork this repository or take it over, but note that you could cause damage by randomly turning things on and off.
+  - Chlorinator
+  - Enabled
 
 ---
 
 ## **Installing the Insnrg Custom Integration in Home Assistant via HACS**
 
-This guide will walk you through the steps to install and set up the custom Insnrg integration in Home Assistant via the Home Assistant Community Store (HACS).
+This guide will walk you through the steps to install and set up the Insnrg custom integration in Home Assistant via the Home Assistant Community Store (HACS).
 
 ### **Prerequisites**
 
