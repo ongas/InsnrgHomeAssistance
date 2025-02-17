@@ -25,7 +25,7 @@ class InsnrgPool:
             if data["auth"]["idToken"] is None:
                 return False
             else:
-                if len(data["devices"]) > 0:
+                if len(data["devices"]) > 0: #serial = systemId
                     return data["devices"][0]["serial"]
                 return "DEMO"
         else:
@@ -42,29 +42,18 @@ class InsnrgPool:
             data = await resp.json(content_type=None)
             URL_DATA = CMD_URL
             body = {
-                "cmd": "discover",
+                "cmd": "getall",
                 "userId": data['user']['userId']
                 }
             head = {'Authorization': data["auth"]["idToken"]}
             resp = await self._session.post(URL_DATA, headers=head, json=body)
+            result_dict = {}
             if resp.status == 200:
-                discoverData = await resp.json(content_type=None)
-                device_ids = [item["deviceId"] for item in discoverData]
-                all_device_body = {
-                    "cmd": "getAllDeviceStatus",
-                    "deviceIdList": device_ids,
-                    "userId": data['user']['userId']
-                    }
-                all_device_resp = await self._session.post(URL_DATA, headers=head, json=all_device_body)
-                if all_device_resp.status == 200:
-                    all_device_data = await all_device_resp.json(content_type=None)
-                    all_device_data_dict = {item['deviceId']: item for item in all_device_data}
-                    result_dict = {}
-                    for item in discoverData:
-                        device_id = item['deviceId']
-                        if device_id in all_device_data_dict:
-                            status = all_device_data_dict[device_id]['status']['properties']
-                            result_dict[device_id] = {
+                discoverData = await resp.json(content_type=None)                
+                for item in discoverData:
+                    device_id = item['deviceId']
+                    status = item['properties']
+                    result_dict[device_id] = {
                                 'name': item['name'],
                                 'deviceId': item['deviceId'],
                                 'type': item['type'][0],
@@ -74,19 +63,17 @@ class InsnrgPool:
                                 'temperatureSensorStatus': next((prop['value'] for prop in status if prop['namespace'] == 'Alexa.TemperatureSensor'), {}),
                                 'modeValue': next((prop['value'] for prop in status if prop['namespace'] == 'Alexa.ModeController'), ''),
                             }
-                            if item['type'][0] == "LIGHT":
-                                result_dict["LIGHT_MODE"] = {
-                                'name': "Light Modes",
-                                'deviceId': "LIGHT_MODE",
-                                'supportCmd': item['deviceId'],
-                                'modeValue': next((prop['value'] for prop in status if prop['namespace'] == 'Alexa.ModeController'), ''),
-                                "modeList" : item['options']
-                                }
-                            if "options" in item:
-                                result_dict[device_id]["modeList"] = item['options']
-                    results = result_dict
-                else:
-                    raise InsnrgPoolError(resp.status,"Server error.")
+                    if item['type'][0] == "LIGHT":
+                        result_dict["LIGHT_MODE"] = {
+                            'name': "Light Modes",
+                            'deviceId': "LIGHT_MODE",
+                            'supportCmd': item['deviceId'],
+                            'modeValue': next((prop['value'] for prop in status if prop['namespace'] == 'Alexa.ModeController'), ''),
+                            "modeList" : item['options']
+                            }
+                    if "options" in item:
+                        result_dict[device_id]["modeList"] = item['options']
+                results = result_dict
             else:
                 raise InsnrgPoolError(resp.status,"Server error.")
         else:

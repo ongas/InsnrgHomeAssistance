@@ -28,9 +28,12 @@ async def async_setup_entry(
     number_descriptions = []
     for key in KEYS_TO_CHECK:
         if key in coordinator.data:
+            name = coordinator.data[key]['name']
+            if coordinator.data[key]["thermostatStatus"]["valueMax"] > 0:
+                name =  f"Set {key} Point"
             number_descriptions.append(NumberEntityDescription(
                 key=key,
-                name=coordinator.data[key]['name'],
+                name=name,
             ))
     entities = [
         InsnrgPoolNumber(coordinator, hass, config_entry, description)
