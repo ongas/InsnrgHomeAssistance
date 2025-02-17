@@ -35,6 +35,14 @@ KEYS_TO_CHECK = [
     "VALVE_HUB_3",
     "VALVE_HUB_4",
     "LIGHT_MODE",
+    "TIMER_1_STATUS",
+    "TIMER_2_STATUS",
+    "TIMER_3_STATUS",
+    "TIMER_4_STATUS",
+    "TIMER_1_CHL",
+    "TIMER_2_CHL",
+    "TIMER_3_CHL",
+    "TIMER_4_CHL",
 ]
 LIGHT_MODE_LIST = []
 
@@ -86,9 +94,13 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity):
     def options(self):
         """Return the list of available options."""
         deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
+        timerDevices = ["TIMER_1_STATUS","TIMER_2_STATUS", 
+                        "TIMER_3_STATUS","TIMER_4_STATUS",
+                        "TIMER_1_CHL", "TIMER_2_CHL", "TIMER_3_CHL", 
+                        "TIMER_4_CHL"]
         if deviceId == "LIGHT_MODE":
             return self.coordinator.data[self.entity_description.key]["modeList"]
-        elif deviceId == "SPA_ON":
+        elif deviceId == "SPA" or any(item == deviceId for item in timerDevices):
             return ["ON", "OFF"]
         else:
             return ["ON", "OFF", "TIMER"]
