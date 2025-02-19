@@ -3,8 +3,9 @@
   "name": "Insnrg",
   "codeowners": ["@jaringuyen","@mingman1414"],
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/Insrg",
+  "documentation": "https://github.com/jaringuyen/InsnrgHomeAssistance",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jaringuyen/InsnrgHomeAssistance/issues",
   "loggers": ["insnrg"],
   "requirements": [],
   "version": "1.0.0"
