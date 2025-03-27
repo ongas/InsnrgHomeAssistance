@@ -41,6 +41,7 @@ This guide will walk you through the steps to install and set up the Insnrg cust
 
 - **Home Assistant** must already be installed and configured on your system.
 - **HACS** should be installed. If not, follow the instructions at [HACS Installation](https://www.hacs.xyz/docs/use/download/prerequisites/).
+- NOTES: Please contact insnrgdev@insnrg.com to request access to Insnrg 3rd Party REST API, and enable Voice Control in Connected Systems screen.
 
 ### **Step-by-Step Guide**
 
