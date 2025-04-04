@@ -92,3 +92,15 @@ This guide will walk you through the steps to install and set up the Insnrg cust
 - After successful setup, the sensors for your chlorinator will be created.
 - You can view them under **"Settings" > "Devices & Services"**.
 - Add the desired sensors to your dashboard to display the data.
+
+## **Notes**
+If you have any issues with Insnrg entities, please try to Reload the integration.
+To reload a HACS integration in Home Assistant, follow these steps:
+
+- Open Home Assistant and go to Settings > Devices & Services.
+- Find the integration you want to reload.
+- Click on the three-dot menu (⋮) next to the integration.
+- Select Reload from the menu.
+- If the integration doesn't support reloading, you might need to restart Home Assistant.
+
+  
