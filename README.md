@@ -10,10 +10,11 @@
  <img src="https://github.com/user-attachments/assets/4b954930-9611-4408-a047-09a35a6e01cc" alt="Image">
 </p>
 
-The Insnrg custom integration sets up 33 sensors:
+The Insnrg custom integration sets up 38 sensors:
 
 - **SPA**
 - **Filter Mode**
+- **All Auto**
 - **Set Spa Temperature**
 - **Set Pool Temperature**
 - **Current pH**
@@ -30,6 +31,8 @@ The Insnrg custom integration sets up 33 sensors:
 - **Timer data for each of the 4 timers**:
   - Chlorinator
   - Enabled
+- **VF Contact data for each of the 1 Vi-VF Contact and 3 Hub-VF Contacts**:
+  - Heat Pump, Gas
 
 ---
 
@@ -94,6 +97,7 @@ This guide will walk you through the steps to install and set up the Insnrg cust
 - Add the desired sensors to your dashboard to display the data.
 
 ## **Notes**
+
 If you have any issues with Insnrg entities, please try to Reload the integration.
 To reload a HACS integration in Home Assistant, follow these steps:
 
@@ -102,5 +106,3 @@ To reload a HACS integration in Home Assistant, follow these steps:
 - Click on the three-dot menu (⋮) next to the integration.
 - Select Reload from the menu.
 - If the integration doesn't support reloading, you might need to restart Home Assistant.
-
-  
