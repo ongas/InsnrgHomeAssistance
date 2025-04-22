@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from .call_api import InsnrgPool
 from .exceptions import InsnrgPoolError
 from homeassistant.components.select import (
@@ -20,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 KEYS_TO_CHECK = [
     "SPA",
     "MODE",
+    "TIMERS",
     "OUTLET_1",
     "OUTLET_2",
     "OUTLET_3",
@@ -43,6 +45,10 @@ KEYS_TO_CHECK = [
     "TIMER_2_CHL",
     "TIMER_3_CHL",
     "TIMER_4_CHL",
+    "VF_CONTACT_1",
+    "VF_CONTACT_HUB_1",
+    "VF_CONTACT_HUB_2",
+    "VF_CONTACT_HUB_3"
 ]
 LIGHT_MODE_LIST = []
 
@@ -100,7 +106,7 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity):
                         "TIMER_4_CHL"]
         if deviceId == "LIGHT_MODE":
             return self.coordinator.data[self.entity_description.key]["modeList"]
-        elif deviceId == "SPA" or any(item == deviceId for item in timerDevices):
+        elif deviceId == "SPA" or deviceId == "TIMERS" or any(item == deviceId for item in timerDevices):
             return ["ON", "OFF"]
         else:
             return ["ON", "OFF", "TIMER"]
@@ -112,8 +118,10 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity):
             supportCmd = self.coordinator.data[self.entity_description.key]["supportCmd"]
             success = await self.insnrg_pool.change_light_mode(option, supportCmd)
         else:
+            _LOGGER.info({option: option, deviceId: deviceId})
             success = await self.insnrg_pool.turn_the_switch(option, deviceId)
         if success:
+            await asyncio.sleep(3)
             await self.coordinator.async_request_refresh()
         else:
             _LOGGER.error("Failed to select the option.")
