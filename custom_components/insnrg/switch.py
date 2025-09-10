@@ -1,17 +1,16 @@
 """Switch platform for the Insnrg Pool integration."""
 from __future__ import annotations
 
+import logging
+
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
-import asyncio
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import InsnrgPoolEntity
 from .const import DOMAIN
-from .polling_mixin import PollingMixin, STARTER_ICON
-import logging
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -24,7 +23,8 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = []
-    
+
+    # These are the device IDs that are switches
     switch_devices = ["VF_SETTING_SET_HEATER_MODE", "SPA"]
 
     for device_id in switch_devices:
@@ -34,83 +34,57 @@ async def async_setup_entry(
                 key=device_id,
                 name=f'{device["name"]} Switch',
             )
-            entities.append(
-                InsnrgPoolSwitch(
-                    coordinator, config_entry.data[CONF_EMAIL], description, device_id, hass
-                )
-            )
+            entities.append(InsnrgPoolSwitch(coordinator, description, device_id))
 
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
-class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
+class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity):
     """Switch representing Insnrg Pool data."""
 
-    def __init__(self, coordinator, email, description, device_id, hass):
+    def __init__(self, coordinator, description, device_id):
         """Initialize Insnrg Pool switch."""
-        super().__init__(coordinator, email, description)
+        super().__init__(coordinator, description)
         self._device_id = device_id
-        self.hass = hass # Required for polling mixin
-        # Initialize _attr_is_on based on current coordinator data
-        self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+        self._update_state_from_coordinator()
 
-    @property
-    def is_on(self) -> bool:
-        """Return true if the switch is on."""
-        # Always return _attr_is_on for optimistic updates
-        return self._attr_is_on
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_state_from_coordinator()
+        super()._handle_coordinator_update()
+
+    def _update_state_from_coordinator(self) -> None:
+        """Update the state of the switch from the coordinator data."""
+        self._attr_is_on = (
+            self.coordinator.data.get(self._device_id, {}).get("switchStatus") == "ON"
+        )
+
+    async def _turn_on_off(self, mode: str):
+        """Shared function to turn the switch on or off."""
+        # Optimistic update
+        self._attr_is_on = mode == "ON"
+        self.async_write_ha_state()
+
+        # Call the API
+        success = await self.coordinator.insnrg_pool.turn_the_switch(
+            mode, self._device_id
+        )
+
+        # If the API call failed, revert the optimistic update
+        # and let the next coordinator refresh fix the state.
+        if not success:
+            self._attr_is_on = not self._attr_is_on
+            self.async_write_ha_state()
+            _LOGGER.error(f"Failed to turn {mode} {self.entity_id}.")
+        
+        # Request a refresh to get the latest state
+        await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        # Optimistic update
-        self._attr_is_on = True
-        self.async_write_ha_state()
-        original_icon = getattr(self, '_attr_icon', None) # Capture original icon
-        self._attr_icon = STARTER_ICON # Set starter icon
-        self.async_write_ha_state()
-
-        api_call_task = asyncio.create_task(self.coordinator.insnrg_pool.turn_the_switch(
-            "ON", self._device_id
-        ))
-        
-        await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
-
-        animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
-        success = await api_call_task # Wait for the API call to complete
-
-        if success:
-            # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, "ON", 
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"), entity_type="switchStatus", animation_task=animation_task)
-            if not poll_success:
-                # Revert if polling failed, get actual state from coordinator
-                self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
-                self.async_write_ha_state()
-        else:
-            _LOGGER.error(f"Failed to turn ON {self.entity_id}.")
-            # Revert if command failed, get actual state from coordinator
-            self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
-            self.async_write_ha_state()
+        await self._turn_on_off("ON")
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
-        # Optimistic update
-        self._attr_is_on = False
-        self.async_write_ha_state()
-        original_icon = getattr(self, '_attr_icon', None) # Capture original icon
-        self._attr_icon = STARTER_ICON # Set starter icon
-        self.async_write_ha_state()
-
-        api_call_task = asyncio.create_task(self.coordinator.insnrg_pool.turn_the_switch(
-            "OFF", self._device_id
-        ))
-        
-        await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
-
-        animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
-        success = await api_call_task # Wait for the API call to complete
-
-        if success:
-            # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, "OFF", 
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"), entity_type="switchStatus", animation_task=animation_task)
+        await self._turn_on_off("OFF")
