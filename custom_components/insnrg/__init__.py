@@ -1,5 +1,5 @@
 """The InsnrgPool integration."""
-import asyncio
+
 from datetime import timedelta
 import logging
 import async_timeout

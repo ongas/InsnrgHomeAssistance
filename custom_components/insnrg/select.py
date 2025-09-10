@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 from .call_api import InsnrgPool
-from .exceptions import InsnrgPoolError
 from homeassistant.components.select import (
     SelectEntity,
     SelectEntityDescription,

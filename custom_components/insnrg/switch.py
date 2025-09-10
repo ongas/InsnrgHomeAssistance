@@ -114,3 +114,12 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
             # Pass a lambda that checks the actual coordinator data
             poll_success = await self._async_poll_for_state_change(self, original_icon, "OFF", 
                 lambda: self.coordinator.data[self._device_id].get("switchStatus"), entity_type="switchStatus", animation_task=animation_task)
+            if not poll_success:
+                # Revert if polling failed, get actual state from coordinator
+                self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+                self.async_write_ha_state()
+        else:
+            _LOGGER.error(f"Failed to turn OFF {self.entity_id}.")
+            # Revert if command failed, get actual state from coordinator
+            self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+            self.async_write_ha_state()
