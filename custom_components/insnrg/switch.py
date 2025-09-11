@@ -66,19 +66,13 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity):
         self._attr_is_on = mode == "ON"
         self.async_write_ha_state()
 
-        # Call the API
-        success = await self.coordinator.insnrg_pool.turn_the_switch(
+        # Call the API. Errors are logged within the API module.
+        await self.coordinator.insnrg_pool.turn_the_switch(
             mode, self._device_id
         )
-
-        # If the API call failed, revert the optimistic update
-        # and let the next coordinator refresh fix the state.
-        if not success:
-            self._attr_is_on = not self._attr_is_on
-            self.async_write_ha_state()
-            _LOGGER.error(f"Failed to turn {mode} {self.entity_id}.")
         
-        # Request a refresh to get the latest state
+        # Request a refresh to get the latest state from the device.
+        # The UI will show the optimistic state until this refresh completes.
         await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs) -> None:

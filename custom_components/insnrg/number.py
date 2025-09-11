@@ -79,17 +79,14 @@ class InsnrgPoolNumber(InsnrgPoolEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
-        original_value = self._attr_native_value
         # Optimistic update
         self._attr_native_value = value
         self.async_write_ha_state()
 
         device_id = self.coordinator.data[self.entity_description.key]["deviceId"]
-        success = await self.coordinator.insnrg_pool.set_chemistry(value, device_id)
+        
+        # Call the API. Errors are logged within the API module.
+        await self.coordinator.insnrg_pool.set_chemistry(value, device_id)
 
-        if not success:
-            _LOGGER.error(f"Failed to set value for {self.entity_id}.")
-            self._attr_native_value = original_value
-            self.async_write_ha_state()
-
+        # Request a refresh to get the latest state from the device.
         await self.coordinator.async_request_refresh()

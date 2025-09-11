@@ -96,18 +96,15 @@ class InsnrgPoolClimate(InsnrgPoolEntity, ClimateEntity):
             return
 
         # Optimistic update
-        original_temp = self._attr_target_temperature
         self._attr_target_temperature = temp_value
         self.async_write_ha_state()
 
         deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
-        success = await self.coordinator.insnrg_pool.set_thermostat_temp(
+        
+        # Call the API. Errors are logged within the API module.
+        await self.coordinator.insnrg_pool.set_thermostat_temp(
             temp_value, deviceId
         )
 
-        if not success:
-            self._attr_target_temperature = original_temp
-            self.async_write_ha_state()
-            _LOGGER.error(f"Failed to set temperature for {self.entity_id}.")
-
+        # Request a refresh to get the latest state from the device.
         await self.coordinator.async_request_refresh()

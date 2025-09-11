@@ -116,7 +116,6 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        original_option = self._attr_current_option
         # Optimistic update
         self._attr_current_option = option
         self.async_write_ha_state()
@@ -124,16 +123,12 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity):
         device_data = self.coordinator.data[self.entity_description.key]
         device_id = device_data["deviceId"]
         
-        success = False
+        # Call the API. Errors are logged within the API module.
         if device_id == "LIGHT_MODE":
             support_cmd = device_data["supportCmd"]
-            success = await self.coordinator.insnrg_pool.change_light_mode(option, support_cmd)
+            await self.coordinator.insnrg_pool.change_light_mode(option, support_cmd)
         else:
-            success = await self.coordinator.insnrg_pool.turn_the_switch(option, device_id)
+            await self.coordinator.insnrg_pool.turn_the_switch(option, device_id)
 
-        if not success:
-            _LOGGER.error(f"Failed to select option '{option}' for {self.entity_id}.")
-            self._attr_current_option = original_option
-            self.async_write_ha_state()
-
+        # Request a refresh to get the latest state from the device.
         await self.coordinator.async_request_refresh()
