@@ -85,22 +85,29 @@ class InsnrgPoolDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Update data via library."""
+        _LOGGER.debug("Coordinator: Starting data update.")
         try:
             async with async_timeout.timeout(60):
                 # First, ensure we are logged in.
                 # test_insnrg_pool_credentials now just calls async_login
                 if not self.insnrg_pool._id_token:
+                    _LOGGER.debug("Coordinator: No token found, attempting login.")
                     auth_ok = await self.insnrg_pool.test_insnrg_pool_credentials()
                     if not auth_ok:
+                        _LOGGER.error("Coordinator: Authentication failed.")
                         # This will trigger a re-auth flow
                         raise ConfigEntryAuthFailed("Invalid credentials")
+                    _LOGGER.debug("Coordinator: Login successful.")
                 
                 # Then, fetch the data
-                return await self.insnrg_pool.get_insnrg_pool_data()
+                _LOGGER.debug("Coordinator: Fetching pool data.")
+                data = await self.insnrg_pool.get_insnrg_pool_data()
+                _LOGGER.debug(f"Coordinator: Successfully fetched data: {data}")
+                return data
 
         except InsnrgPoolError as error:
-            _LOGGER.error("Insnrg Pool query did not complete")
+            _LOGGER.error(f"Coordinator: Insnrg Pool query did not complete: {error}")
             raise UpdateFailed(error) from error
         except Exception as error:
-            _LOGGER.error("Unexpected error updating Insnrg Pool data")
+            _LOGGER.error(f"Coordinator: Unexpected error updating Insnrg Pool data: {error}", exc_info=True)
             raise UpdateFailed(error) from error

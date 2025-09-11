@@ -25,17 +25,27 @@ class InsnrgPool:
             "userName": self._userName,
             "password": self._password,
         }
+        _LOGGER.debug("API: Attempting login.")
         resp = await self._session.post(self._url_login, json=LOGIN_DATA)
-        if resp.status == 200:
+
+        try:
             data = await resp.json(content_type=None)
-            if data.get("auth", {}).get("idToken"):
-                self._id_token = data["auth"]["idToken"]
-                self._user_id = data.get("user", {}).get("userId")
-                if data.get("devices"):
-                    self._device_serial = data["devices"][0]["serial"]
-                else:
-                    self._device_serial = "DEMO"
-                return True
+            _LOGGER.debug(f"API: Login response status: {resp.status}, data: {data}")
+        except Exception:
+            text_data = await resp.text()
+            _LOGGER.debug(f"API: Login response status: {resp.status}, non-json data: {text_data}")
+            data = {}
+
+        if resp.status == 200 and data.get("auth", {}).get("idToken"):
+            self._id_token = data["auth"]["idToken"]
+            self._user_id = data.get("user", {}).get("userId")
+            if data.get("devices"):
+                self._device_serial = data["devices"][0]["serial"]
+            else:
+                self._device_serial = "DEMO"
+            return True
+        
+        _LOGGER.error("API: Login failed.")
         return False
 
     async def test_insnrg_pool_credentials(self):
@@ -51,10 +61,17 @@ class InsnrgPool:
 
         head = {"Authorization": f"Bearer {self._id_token}"}
         
-        # Add user_id to every request body
         body["userId"] = self._user_id
 
+        _LOGGER.debug(f"API: Sending command with body: {body}")
         resp = await self._session.post(CMD_URL, headers=head, json=body)
+
+        try:
+            resp_data = await resp.json(content_type=None)
+            _LOGGER.debug(f"API: Command response status: {resp.status}, data: {resp_data}")
+        except Exception:
+            resp_text = await resp.text()
+            _LOGGER.debug(f"API: Command response status: {resp.status}, non-json data: {resp_text}")
 
         # If token has expired, try to re-login once
         if resp.status == 401:
@@ -75,7 +92,7 @@ class InsnrgPool:
         result_dict = {}
         if resp.status == 200:
             discoverData = await resp.json(content_type=None)
-            _LOGGER.debug(f"getall API response data: {discoverData}")
+            # The original debug log here is fine, no need to change it.
 
             for item in discoverData:
                 device_id = item["deviceId"]

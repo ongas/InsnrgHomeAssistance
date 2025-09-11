@@ -1,24 +1,21 @@
 from __future__ import annotations
-import asyncio
-from .call_api import InsnrgPool
+import logging
+
 from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
+    NumberMode,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_EMAIL,
-    CONF_PASSWORD,
-)
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers import aiohttp_client
+
 from . import InsnrgPoolEntity
 from .const import DOMAIN
-from .polling_mixin import PollingMixin, STARTER_ICON
-import logging
+
 _LOGGER = logging.getLogger(__name__)
 KEYS_TO_CHECK = ["PH", "ORP"]
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -31,88 +28,68 @@ async def async_setup_entry(
     for key in KEYS_TO_CHECK:
         if key in coordinator.data:
             name = coordinator.data[key]['name']
-            if coordinator.data[key]["thermostatStatus"]["valueMax"] > 0:
-                name =  f"Set {key} Point"
+            if coordinator.data[key].get("thermostatStatus", {}).get("valueMax", 0) > 0:
+                name = f"Set {key} Point"
             number_descriptions.append(NumberEntityDescription(
                 key=key,
                 name=name,
             ))
     entities = [
-        InsnrgPoolNumber(coordinator, hass, config_entry, description)
+        InsnrgPoolNumber(coordinator, description)
         for description in number_descriptions
     ]
-    async_add_entities(entities, False)
+    async_add_entities(entities)
 
-class InsnrgPoolNumber(InsnrgPoolEntity, NumberEntity, PollingMixin):
+
+class InsnrgPoolNumber(InsnrgPoolEntity, NumberEntity):
     """Number entity representing Insnrg Pool data."""
-    def __init__(self, coordinator, hass, entry, description):
-        """Initialize Insnrg Pool number."""
-        super().__init__(coordinator, entry, description)
-        self.insnrg_pool = InsnrgPool(
-            aiohttp_client.async_get_clientsession(hass),
-            entry.data[CONF_EMAIL],
-            entry.data[CONF_PASSWORD],
-        )
-        self.hass = hass # Required for polling mixin
-        # Initialize _attr_native_value based on current coordinator data
-        self._attr_native_value = self.coordinator.data[self.entity_description.key]["thermostatStatus"]["setPoint"]
-    
-    @property
-    def mode(self) -> str | None:
-        """Return the mode."""
-        return "slider"
+    _attr_mode = NumberMode.SLIDER
 
-    @property
-    def native_max_value(self) -> float | None:
-        """Return the current temperature."""
-        return self.coordinator.data[self.entity_description.key]["thermostatStatus"]["valueMax"]
-    
-    @property
-    def native_min_value(self) -> float | None:
-        """Return the current temperature."""
-        return self.coordinator.data[self.entity_description.key]["thermostatStatus"]["valueMin"]
+    def __init__(self, coordinator, description):
+        """Initialize Insnrg Pool number."""
+        super().__init__(coordinator, description)
+        self._update_state_from_coordinator()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_state_from_coordinator()
+        super()._handle_coordinator_update()
+
+    def _get_thermostat_status(self) -> dict:
+        """Get the thermostat status dictionary from the coordinator data."""
+        return self.coordinator.data.get(self.entity_description.key, {}).get(
+            "thermostatStatus", {}
+        )
+
+    def _update_state_from_coordinator(self) -> None:
+        """Update the state of the number entity from coordinator data."""
+        thermostat_status = self._get_thermostat_status()
+        self._attr_native_value = thermostat_status.get("setPoint")
+        self._attr_native_max_value = thermostat_status.get("valueMax")
+        self._attr_native_min_value = thermostat_status.get("valueMin")
 
     @property
     def native_step(self) -> float:
-        """Return the unit of measurement."""
+        """Return the step size."""
         if self.entity_description.key == "ORP":
             return 10
         else:
             return 0.1
 
-    @property
-    def native_value(self) -> float:
-        """Return the current temperature."""
-        # Always return _attr_native_value for optimistic updates
-        return self._attr_native_value
-    
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
+        original_value = self._attr_native_value
         # Optimistic update
         self._attr_native_value = value
         self.async_write_ha_state()
-        original_icon = getattr(self, '_attr_icon', None) # Capture original icon
-        self._attr_icon = STARTER_ICON # Set starter icon
-        self.async_write_ha_state()
 
-        deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
-        api_call_task = asyncio.create_task(self.insnrg_pool.set_chemistry(value, deviceId))
-        
-        await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
+        device_id = self.coordinator.data[self.entity_description.key]["deviceId"]
+        success = await self.coordinator.insnrg_pool.set_chemistry(value, device_id)
 
-        animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
-        success = await api_call_task # Wait for the API call to complete
-
-        if success:
-            # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, value, 
-                lambda: self.coordinator.data[self.entity_description.key]["thermostatStatus"]["setPoint"], entity_type="value", animation_task=animation_task)
-            if not poll_success:
-                # Revert if polling failed, get actual state from coordinator
-                self._attr_native_value = self.coordinator.data[self.entity_description.key]["thermostatStatus"]["setPoint"]
-                self.async_write_ha_state()
-        else:
-            _LOGGER.error(f"Failed to set the value for {self.entity_id}.")
-            # Revert if command failed, get actual state from coordinator
-            self._attr_native_value = self.coordinator.data[self.entity_description.key]["thermostatStatus"]["setPoint"]
+        if not success:
+            _LOGGER.error(f"Failed to set value for {self.entity_id}.")
+            self._attr_native_value = original_value
             self.async_write_ha_state()
+
+        await self.coordinator.async_request_refresh()
