@@ -20,20 +20,29 @@ CLOCK_ICONS = [
 SUCCESS_ICON = "mdi:check-circle-outline"
 STARTER_ICON = "mdi:circle-outline"
 
+
 class PollingMixin:
     async def _async_animate_icon(self, entity, original_icon_for_animation):
         try:
-            index = 0 # Start from the first icon in the animation sequence
+            index = 0  # Start from the first icon in the animation sequence
             while True:
                 entity._attr_icon = CLOCK_ICONS[index]
                 entity.async_write_ha_state()
                 index = (index + 1) % len(CLOCK_ICONS)
-                await asyncio.sleep(1.0) # Animation speed: 1 second per icon
+                await asyncio.sleep(1.0)  # Animation speed: 1 second per icon
         except asyncio.CancelledError:
             # Animation cancelled, revert to original icon (handled in finally block of caller)
             pass
 
-    async def _async_poll_for_state_change(self, entity, original_icon_from_entity, target_value, current_value_getter, entity_type: str, animation_task=None):
+    async def _async_poll_for_state_change(
+        self,
+        entity,
+        original_icon_from_entity,
+        target_value,
+        current_value_getter,
+        entity_type: str,
+        animation_task=None,
+    ):
         try:
             polling_timeout = 300  # seconds (5 minutes)
             polling_interval = 5  # seconds
@@ -43,15 +52,21 @@ class PollingMixin:
             while entity.hass.loop.time() - start_time < polling_timeout:
                 await entity.coordinator.async_request_refresh()
                 current_value = current_value_getter()
-                _LOGGER.debug(f"Polling {entity.entity_id}. Current {entity_type}: {current_value}, Target: {target_value}")
+                _LOGGER.debug(
+                    f"Polling {entity.entity_id}. Current {entity_type}: {current_value}, Target: {target_value}"
+                )
                 if current_value == target_value:
-                    _LOGGER.debug(f"{entity.entity_id} successfully set to {target_value} and state confirmed.")
+                    _LOGGER.debug(
+                        f"{entity.entity_id} successfully set to {target_value} and state confirmed."
+                    )
                     success = True
                     break
                 await asyncio.sleep(polling_interval)
 
             if not success:
-                _LOGGER.warning(f"Timeout: {entity.entity_id} did not report {target_value} within {polling_timeout} seconds.")
+                _LOGGER.warning(
+                    f"Timeout: {entity.entity_id} did not report {target_value} within {polling_timeout} seconds."
+                )
 
             return success
         finally:
@@ -61,13 +76,13 @@ class PollingMixin:
                 try:
                     await animation_task
                 except asyncio.CancelledError:
-                    pass # Expected when cancelling
-            
+                    pass  # Expected when cancelling
+
             # Set final icon based on success or revert to original
             if success:
                 entity._attr_icon = SUCCESS_ICON
                 entity.async_write_ha_state()
-                await asyncio.sleep(0.5) # Display success icon for 0.5 second
+                await asyncio.sleep(0.5)  # Display success icon for 0.5 second
                 entity._attr_icon = original_icon_from_entity
                 entity.async_write_ha_state()
             else:

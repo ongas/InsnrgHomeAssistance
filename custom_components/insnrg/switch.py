@@ -1,8 +1,9 @@
 """Switch platform for the Insnrg Pool integration."""
 from __future__ import annotations
 
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 import asyncio
+import logging
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
@@ -11,7 +12,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import InsnrgPoolEntity
 from .const import DOMAIN
 from .polling_mixin import PollingMixin, STARTER_ICON
-import logging
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -25,7 +25,19 @@ async def async_setup_entry(
 
     entities = []
     
-    switch_devices = ["VF_SETTING_SET_HEATER_MODE", "SPA"]
+    switch_devices = [
+        "VF_SETTING_SET_HEATER_MODE",
+        "SPA",
+        "OUTLET_1",
+        "OUTLET_2",
+        "OUTLET_3",
+        "OUTLET_4",
+        "OUTLET_5",
+        "OUTLET_6",
+        "OUTLET_7",
+        "OUTLET_HUB_4",
+        "OUTLET_HUB_6",
+    ]
 
     for device_id in switch_devices:
         if device_id in coordinator.data:
@@ -34,11 +46,15 @@ async def async_setup_entry(
                 key=device_id,
                 name=f'{device["name"]} Switch',
             )
-            entities.append(
-                InsnrgPoolSwitch(
-                    coordinator, config_entry.data[CONF_EMAIL], description, device_id, hass
-                )
+            new_switch = InsnrgPoolSwitch(
+                coordinator,
+                config_entry.data[CONF_EMAIL],
+                description,
+                device_id,
+                hass,
             )
+            entities.append(new_switch)
+            _LOGGER.debug("Created switch entity: %s (%s)", new_switch.entity_id, new_switch.name)
 
     async_add_entities(entities, True)
 
@@ -69,9 +85,9 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         self._attr_icon = STARTER_ICON # Set starter icon
         self.async_write_ha_state()
 
-        api_call_task = asyncio.create_task(self.coordinator.insnrg_pool.turn_the_switch(
-            "ON", self._device_id
-        ))
+        api_call_task = asyncio.create_task(
+            self.coordinator.insnrg_pool.turn_the_switch("ON", self._device_id)
+        )
         
         await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
 
@@ -80,14 +96,22 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
 
         if success:
             # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, "ON", 
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"), entity_type="switchStatus", animation_task=animation_task)
+            poll_success = await self._async_poll_for_state_change(
+                self,
+                original_icon,
+                "ON",
+                lambda: self.coordinator.data[self._device_id].get("switchStatus"),
+                entity_type="switchStatus",
+                animation_task=animation_task,
+            )
             if not poll_success:
                 # Revert if polling failed, get actual state from coordinator
                 self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
                 self.async_write_ha_state()
         else:
-            _LOGGER.error(f"Failed to turn ON {self.entity_id}.")
+            _LOGGER.error(
+                "Failed to turn ON %s.", self.entity_id
+            )
             # Revert if command failed, get actual state from coordinator
             self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
             self.async_write_ha_state()
@@ -101,9 +125,9 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         self._attr_icon = STARTER_ICON # Set starter icon
         self.async_write_ha_state()
 
-        api_call_task = asyncio.create_task(self.coordinator.insnrg_pool.turn_the_switch(
-            "OFF", self._device_id
-        ))
+        api_call_task = asyncio.create_task(
+            self.coordinator.insnrg_pool.turn_the_switch("OFF", self._device_id)
+        )
         
         await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
 
@@ -112,14 +136,22 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
 
         if success:
             # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, "OFF", 
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"), entity_type="switchStatus", animation_task=animation_task)
+            poll_success = await self._async_poll_for_state_change(
+                self,
+                original_icon,
+                "OFF",
+                lambda: self.coordinator.data[self._device_id].get("switchStatus"),
+                entity_type="switchStatus",
+                animation_task=animation_task,
+            )
             if not poll_success:
                 # Revert if polling failed, get actual state from coordinator
                 self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
                 self.async_write_ha_state()
         else:
-            _LOGGER.error(f"Failed to turn OFF {self.entity_id}.")
+            _LOGGER.error(
+                "Failed to turn OFF %s.", self.entity_id
+            )
             # Revert if command failed, get actual state from coordinator
             self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
             self.async_write_ha_state()

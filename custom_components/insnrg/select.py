@@ -6,10 +6,7 @@ from homeassistant.components.select import (
     SelectEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_EMAIL,
-    CONF_PASSWORD
-)
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers import aiohttp_client
@@ -17,6 +14,7 @@ from . import InsnrgPoolEntity
 from .const import DOMAIN
 from .polling_mixin import PollingMixin, STARTER_ICON
 import logging
+
 _LOGGER = logging.getLogger(__name__)
 KEYS_TO_CHECK = [
     "SPA",
@@ -48,9 +46,10 @@ KEYS_TO_CHECK = [
     "VF_CONTACT_1",
     "VF_CONTACT_HUB_1",
     "VF_CONTACT_HUB_2",
-    "VF_CONTACT_HUB_3"
+    "VF_CONTACT_HUB_3",
 ]
 LIGHT_MODE_LIST = []
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -59,9 +58,17 @@ async def async_setup_entry(
 ) -> None:
     """Defer select setup to the shared select module."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    if not hasattr(coordinator, "data") or not coordinator.data:
+        _LOGGER.warning("Insnrg select setup: coordinator.data is missing or empty! Integration will not process any devices.")
+        _LOGGER.debug(f"Coordinator object: {coordinator} (type: {type(coordinator)})")
+        _LOGGER.debug(f"Coordinator dir: {dir(coordinator)}")
+        _LOGGER.debug(f"Config entry data: {getattr(config_entry, 'data', None)}")
+    else:
+        device_keys = list(coordinator.data.keys())
+        _LOGGER.info(f"Insnrg select setup: coordinator.data keys: {device_keys}")
     select_descriptions = []
     for key in KEYS_TO_CHECK:
-        if key in coordinator.data:
+        if key in getattr(coordinator, "data", {}):
             select_descriptions.append(
                 SelectEntityDescription(
                     key=key,
@@ -74,8 +81,10 @@ async def async_setup_entry(
     ]
     async_add_entities(entities, False)
 
+
 class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
     """Select representing Insnrg Pool data."""
+
     def __init__(self, coordinator, hass, entry, description):
         """Initialize Insnrg Pool select."""
         super().__init__(coordinator, entry, description)
@@ -84,17 +93,20 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
             entry.data[CONF_EMAIL],
             entry.data[CONF_PASSWORD],
         )
-        self.hass = hass # Required for polling mixin
+        self.hass = hass  # Required for polling mixin
         # Initialize _attr_current_option based on current coordinator data
         self._attr_current_option = self._get_current_option_from_coordinator()
 
     def _get_current_option_from_coordinator(self):
         """Helper to get the current option from coordinator data."""
-        if self.coordinator.data[self.entity_description.key]["deviceId"] == "LIGHT_MODE":
+        if (
+            self.coordinator.data[self.entity_description.key]["deviceId"]
+            == "LIGHT_MODE"
+        ):
             return self.coordinator.data[self.entity_description.key]["modeValue"]
-        elif self.coordinator.data[self.entity_description.key]['toggleStatus'] == "ON":
+        elif self.coordinator.data[self.entity_description.key]["toggleStatus"] == "ON":
             return "TIMER"
-        elif self.coordinator.data[self.entity_description.key]['switchStatus'] == "ON":
+        elif self.coordinator.data[self.entity_description.key]["switchStatus"] == "ON":
             return "ON"
         else:
             return "OFF"
@@ -104,18 +116,41 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
         """Return the current selected option."""
         # Always return _attr_current_option for optimistic updates
         return self._attr_current_option
-        
+
     @property
     def options(self):
         """Return the list of available options."""
-        deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
-        timerDevices = ["TIMER_1_STATUS","TIMER_2_STATUS", 
-                        "TIMER_3_STATUS","TIMER_4_STATUS",
-                        "TIMER_1_CHL", "TIMER_2_CHL", "TIMER_3_CHL", 
-                        "TIMER_4_CHL"]
+        key = self.entity_description.key
+        available_keys = list(self.coordinator.data.keys())
+        if key not in self.coordinator.data:
+            _LOGGER.error(
+                f"Key '{key}' not found in coordinator.data. Available keys: {available_keys}"
+            )
+            return []
+        value = self.coordinator.data[key]
+        if not isinstance(value, dict) or "deviceId" not in value:
+            _LOGGER.warning(
+                f"Key '{key}' found in coordinator.data but missing 'deviceId'. Value: {value}"
+            )
+            return []
+        deviceId = value["deviceId"]
+        timerDevices = [
+            "TIMER_1_STATUS",
+            "TIMER_2_STATUS",
+            "TIMER_3_STATUS",
+            "TIMER_4_STATUS",
+            "TIMER_1_CHL",
+            "TIMER_2_CHL",
+            "TIMER_3_CHL",
+            "TIMER_4_CHL",
+        ]
         if deviceId == "LIGHT_MODE":
-            return self.coordinator.data[self.entity_description.key]["modeList"]
-        elif deviceId == "SPA" or deviceId == "TIMERS" or any(item == deviceId for item in timerDevices):
+            return value.get("modeList", [])
+        elif (
+            deviceId == "SPA"
+            or deviceId == "TIMERS"
+            or any(item == deviceId for item in timerDevices)
+        ):
             return ["ON", "OFF"]
         else:
             return ["ON", "OFF", "TIMER"]
@@ -125,27 +160,41 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
         # Optimistic update
         self._attr_current_option = option
         self.async_write_ha_state()
-        original_icon = getattr(self, '_attr_icon', None) # Capture original icon
-        self._attr_icon = STARTER_ICON # Set starter icon
+        original_icon = getattr(self, "_attr_icon", None)  # Capture original icon
+        self._attr_icon = STARTER_ICON  # Set starter icon
         self.async_write_ha_state()
 
         deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
         if deviceId == "LIGHT_MODE":
-            supportCmd = self.coordinator.data[self.entity_description.key]["supportCmd"]
-            api_call_task = asyncio.create_task(self.insnrg_pool.change_light_mode(option, supportCmd))
+            supportCmd = self.coordinator.data[self.entity_description.key][
+                "supportCmd"
+            ]
+            api_call_task = asyncio.create_task(
+                self.insnrg_pool.change_light_mode(option, supportCmd)
+            )
         else:
             _LOGGER.info({option: option, deviceId: deviceId})
-            api_call_task = asyncio.create_task(self.insnrg_pool.turn_the_switch(option, deviceId))
-        
-        await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
+            api_call_task = asyncio.create_task(
+                self.insnrg_pool.turn_the_switch(option, deviceId)
+            )
 
-        animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
-        success = await api_call_task # Wait for the API call to complete
+        await asyncio.sleep(1.0)  # Delay for 1 second before starting clock animation
+
+        animation_task = asyncio.create_task(
+            self._async_animate_icon(self, original_icon)
+        )
+        success = await api_call_task  # Wait for the API call to complete
 
         if success:
             # Pass a lambda that checks the actual coordinator data
-            poll_success = await self._async_poll_for_state_change(self, original_icon, option, 
-                lambda: self._get_current_option_from_coordinator(), entity_type="option", animation_task=animation_task)
+            poll_success = await self._async_poll_for_state_change(
+                self,
+                original_icon,
+                option,
+                lambda: self._get_current_option_from_coordinator(),
+                entity_type="option",
+                animation_task=animation_task,
+            )
             if not poll_success:
                 # Revert if polling failed, get actual state from coordinator
                 self._attr_current_option = self._get_current_option_from_coordinator()
