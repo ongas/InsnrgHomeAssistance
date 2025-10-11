@@ -24,27 +24,14 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = []
-    
-    switch_devices = [
-        "VF_SETTING_SET_HEATER_MODE",
-        "SPA",
-        "OUTLET_1",
-        "OUTLET_2",
-        "OUTLET_3",
-        "OUTLET_4",
-        "OUTLET_5",
-        "OUTLET_6",
-        "OUTLET_7",
-        "OUTLET_HUB_4",
-        "OUTLET_HUB_6",
-    ]
 
-    for device_id in switch_devices:
-        if device_id in coordinator.data:
-            device = coordinator.data[device_id]
+    # Dynamically discover all devices that support switching
+    # by checking for non-empty switchStatus property
+    for device_id, device_data in coordinator.data.items():
+        if isinstance(device_data, dict) and device_data.get("switchStatus"):
             description = SwitchEntityDescription(
                 key=device_id,
-                name=f'{device["name"]} Switch',
+                name=f'{device_data["name"]} Switch',
             )
             new_switch = InsnrgPoolSwitch(
                 coordinator,
@@ -56,6 +43,7 @@ async def async_setup_entry(
             entities.append(new_switch)
             _LOGGER.debug("Created switch entity: %s (%s)", new_switch.entity_id, new_switch.name)
 
+    _LOGGER.info(f"Insnrg switch setup: created {len(entities)} switch entities")
     async_add_entities(entities, True)
 
 

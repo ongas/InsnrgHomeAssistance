@@ -41,12 +41,11 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_coordinator, mock_con
     assert async_add_entities.call_count == 1
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == 2
-    assert isinstance(entities[0], InsnrgPoolSwitch)
-    # Fix: Assert the full, correct name
-    assert entities[0].name == "InsnrgPool Heater Switch"
-    assert isinstance(entities[1], InsnrgPoolSwitch)
-    # Fix: Assert the full, correct name
-    assert entities[1].name == "InsnrgPool Spa Switch"
+    # Check that all entities are InsnrgPoolSwitch instances
+    assert all(isinstance(e, InsnrgPoolSwitch) for e in entities)
+    # Check that we have the expected entity names (order doesn't matter)
+    entity_names = {e.name for e in entities}
+    assert entity_names == {"InsnrgPool Heater Switch", "InsnrgPool Spa Switch"}
 
 
 @patch("custom_components.insnrg.switch.PollingMixin._async_poll_for_state_change", new_callable=AsyncMock)
