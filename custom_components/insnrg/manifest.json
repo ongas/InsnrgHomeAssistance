@@ -1,6 +1,6 @@
 {
   "domain": "insnrg",
-  "name": "Insnrg",
+  "name": "Insnrg (ongas)",
   "codeowners": ["@jaringuyen","@mingman1414"],
   "config_flow": true,
   "documentation": "https://github.com/jaringuyen/InsnrgHomeAssistance",
