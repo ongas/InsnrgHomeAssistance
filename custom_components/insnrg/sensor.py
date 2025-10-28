@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import InsnrgPoolEntity
 from .const import DOMAIN, TEMP_SENSOR_KEY
-KEYS_TO_CHECK = ["PH", "ORP"]
+KEYS_TO_CHECK = ["PH", "ORP", TEMP_SENSOR_KEY]
 
 TEMP_SENSOR_DESCRIPTION = SensorEntityDescription(
     key=TEMP_SENSOR_KEY,
@@ -31,24 +31,25 @@ async def async_setup_entry(
     sersor_descriptions = []
     for key in KEYS_TO_CHECK:
         if key in coordinator.data:
-            sersor_descriptions.append(SensorEntityDescription(
-                key=key,
-                name=coordinator.data[key]['name'],
-                icon="mdi:coolant-temperature",
-            ))
+            if key == TEMP_SENSOR_KEY:
+                sersor_descriptions.append(TEMP_SENSOR_DESCRIPTION)
+            else:
+                sersor_descriptions.append(SensorEntityDescription(
+                    key=key,
+                    name=coordinator.data[key]['name'],
+                    icon="mdi:coolant-temperature",
+                ))
     entities = [
         InsnrgPoolSensor(coordinator, config_entry.data[CONF_EMAIL], description)
-        for description in sersor_descriptions
+        for description in sersor_descriptions if description.key != TEMP_SENSOR_KEY
     ]
 
-    if TEMP_SENSOR_KEY in coordinator.data:
-        entities.append(
-            InsnrgPoolTempSensor(
-                coordinator, config_entry.data[CONF_EMAIL], TEMP_SENSOR_DESCRIPTION
-            )
-        )
+    temp_entities = [
+        InsnrgPoolTempSensor(coordinator, config_entry.data[CONF_EMAIL], description)
+        for description in sersor_descriptions if description.key == TEMP_SENSOR_KEY
+    ]
 
-    async_add_entities(entities, False)
+    async_add_entities(entities + temp_entities, False)
 
 class InsnrgPoolSensor(InsnrgPoolEntity, SensorEntity):
     """Sensor representing Insnrg Pool data."""
