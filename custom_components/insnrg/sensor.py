@@ -7,12 +7,19 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_EMAIL,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import InsnrgPoolEntity
-from .const import DOMAIN
+from .const import DOMAIN, TEMP_SENSOR_KEY
 KEYS_TO_CHECK = ["PH", "ORP"]
+
+TEMP_SENSOR_DESCRIPTION = SensorEntityDescription(
+    key=TEMP_SENSOR_KEY,
+    name="Pool Temperature",
+    icon="mdi:pool-thermometer",
+)
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -33,6 +40,14 @@ async def async_setup_entry(
         InsnrgPoolSensor(coordinator, config_entry.data[CONF_EMAIL], description)
         for description in sersor_descriptions
     ]
+
+    if TEMP_SENSOR_KEY in coordinator.data:
+        entities.append(
+            InsnrgPoolTempSensor(
+                coordinator, config_entry.data[CONF_EMAIL], TEMP_SENSOR_DESCRIPTION
+            )
+        )
+
     async_add_entities(entities, False)
 
 class InsnrgPoolSensor(InsnrgPoolEntity, SensorEntity):
@@ -40,4 +55,18 @@ class InsnrgPoolSensor(InsnrgPoolEntity, SensorEntity):
     @property
     def native_value(self):
         """State of the sensor."""
-        return self.coordinator.data[self.entity_description.key]["temperatureSensorStatus"]["value"]
+        return self.coordinator.data[self.entity_description.key][
+            "temperatureSensorStatus"].get("value")
+
+class InsnrgPoolTempSensor(InsnrgPoolEntity, SensorEntity):
+    """Sensor representing Insnrg Pool Temperature data."""
+
+    @property
+    def native_value(self):
+        """State of the sensor."""
+        return self.coordinator.data[self.entity_description.key]["value"]
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the unit of measurement."""
+        return UnitOfTemperature.CELSIUS
