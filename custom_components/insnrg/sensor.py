@@ -65,7 +65,7 @@ class InsnrgPoolTempSensor(InsnrgPoolEntity, SensorEntity):
     @property
     def native_value(self):
         """State of the sensor."""
-        return self.coordinator.data[self.entity_description.key]["value"]
+        return self.coordinator.data[self.entity_description.key]["temperatureSensorStatus"].get("value")
 
     @property
     def native_unit_of_measurement(self) -> str | None:
