@@ -147,7 +147,7 @@ fi
 
 step "5. Deploying code via rsync"
 # Trailing slash on SRC to copy contents, not the directory itself
-rsync -av --exclude='__pycache__' --exclude='*.pyc' --delete "$SRC/" "$DST" && summary+="Deployed code to HA config.\n"
+sudo rsync -av --exclude='__pycache__' --exclude='*.pyc' --delete "$SRC/" "$DST" && summary+="Deployed code to HA config.\n"
 
 
 
