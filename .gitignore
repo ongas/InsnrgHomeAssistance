@@ -120,4 +120,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.gemini/
 status_update.md
