@@ -1,4 +1,4 @@
-# Insnrg custom integration
+# Insnrg (ongas) custom integration
 
 ![GitHub Release](https://img.shields.io/github/release/jaringuyen/InsnrgHomeAssistance.svg?style=plastic) ![GitHub issues](https://img.shields.io/github/issues/jaringuyen/InsnrgHomeAssistance.svg?style=plastic) ![GitHub Stars](https://img.shields.io/github/stars/jaringuyen/InsnrgHomeAssistance.svg?style=plastic) ![GitHub Last Commit](https://img.shields.io/github/last-commit/jaringuyen/InsnrgHomeAssistance.svg?style=plastic) ![Documentation](https://img.shields.io/badge/docs-excellent-brightgreen.svg?style=plastic) ![HACS Status](https://img.shields.io/badge/HACS-Default-blue.svg?style=plastic) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-%3E%3D%202024.10.1-brightgreen.svg?style=plastic)
 
