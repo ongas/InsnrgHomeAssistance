@@ -120,5 +120,17 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+# AI tooling
+.claude/
 .gemini/
+
+# IDE
+.vscode/
+.idea/
+
+# Project artifacts
 status_update.md
+*.bak
+
+# Docker HA runtime config (deploy target)
+docker/config/
