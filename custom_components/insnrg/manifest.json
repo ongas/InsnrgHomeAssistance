@@ -1,12 +1,12 @@
 {
   "domain": "insnrg",
   "name": "Insnrg (ongas)",
-  "codeowners": ["@jaringuyen","@mingman1414"],
+  "codeowners": ["@ongas"],
   "config_flow": true,
-  "documentation": "https://github.com/jaringuyen/InsnrgHomeAssistance",
+  "documentation": "https://github.com/ongas/InsnrgHomeAssistance",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/jaringuyen/InsnrgHomeAssistance/issues",
+  "issue_tracker": "https://github.com/ongas/InsnrgHomeAssistance/issues",
   "loggers": ["insnrg"],
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.1.0"
 }
