@@ -15,6 +15,25 @@ from .polling_mixin import PollingMixin, STARTER_ICON
 _LOGGER = logging.getLogger(__name__)
 
 
+def _is_on_value(value) -> bool:
+    """Normalize API power/toggle values to an on/off bool."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().upper() in {"ON", "TRUE", "1"}
+
+
+def _device_has_switch_state(device_data: dict) -> bool:
+    """Return True when the device reports either power or toggle state."""
+    return bool(device_data.get("switchStatus") or device_data.get("toggleStatus"))
+
+
+def _device_state_value(device_data: dict):
+    """Return power state, falling back to toggle state for VF contacts."""
+    return device_data.get("switchStatus") or device_data.get("toggleStatus")
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -28,7 +47,7 @@ async def async_setup_entry(
     # Dynamically discover all devices that support switching
     # by checking for non-empty switchStatus property
     for device_id, device_data in coordinator.data.items():
-        if isinstance(device_data, dict) and device_data.get("switchStatus"):
+        if isinstance(device_data, dict) and _device_has_switch_state(device_data):
             description = SwitchEntityDescription(
                 key=device_id,
                 name=f'{device_data["name"]} Switch',
@@ -55,8 +74,18 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         super().__init__(coordinator, email, description)
         self._device_id = device_id
         self.hass = hass # Required for polling mixin
-        # Initialize _attr_is_on based on current coordinator data
-        self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+        self._update_is_on_from_coordinator()
+
+    def _update_is_on_from_coordinator(self) -> None:
+        """Sync _attr_is_on from latest coordinator data."""
+        self._attr_is_on = _is_on_value(
+            _device_state_value(self.coordinator.data[self._device_id])
+        )
+
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_is_on_from_coordinator()
+        super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool:
@@ -88,20 +117,20 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
                 self,
                 original_icon,
                 "ON",
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"),
+                lambda: _device_state_value(self.coordinator.data[self._device_id]),
                 entity_type="switchStatus",
                 animation_task=animation_task,
             )
             if not poll_success:
                 # Revert if polling failed, get actual state from coordinator
-                self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+                self._attr_is_on = _is_on_value(_device_state_value(self.coordinator.data[self._device_id]))
                 self.async_write_ha_state()
         else:
             _LOGGER.error(
                 "Failed to turn ON %s.", self.entity_id
             )
             # Revert if command failed, get actual state from coordinator
-            self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+            self._attr_is_on = _is_on_value(_device_state_value(self.coordinator.data[self._device_id]))
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
@@ -128,18 +157,18 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
                 self,
                 original_icon,
                 "OFF",
-                lambda: self.coordinator.data[self._device_id].get("switchStatus"),
+                lambda: _device_state_value(self.coordinator.data[self._device_id]),
                 entity_type="switchStatus",
                 animation_task=animation_task,
             )
             if not poll_success:
                 # Revert if polling failed, get actual state from coordinator
-                self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+                self._attr_is_on = _is_on_value(_device_state_value(self.coordinator.data[self._device_id]))
                 self.async_write_ha_state()
         else:
             _LOGGER.error(
                 "Failed to turn OFF %s.", self.entity_id
             )
             # Revert if command failed, get actual state from coordinator
-            self._attr_is_on = self.coordinator.data[self._device_id].get("switchStatus") == "ON"
+            self._attr_is_on = _is_on_value(_device_state_value(self.coordinator.data[self._device_id]))
             self.async_write_ha_state()

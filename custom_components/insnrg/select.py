@@ -99,15 +99,23 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
 
     def _get_current_option_from_coordinator(self):
         """Helper to get the current option from coordinator data."""
+        device = self.coordinator.data[self.entity_description.key]
         if (
-            self.coordinator.data[self.entity_description.key]["deviceId"]
-            == "LIGHT_MODE"
+            device["deviceId"] == "LIGHT_MODE"
         ):
-            return self.coordinator.data[self.entity_description.key]["modeValue"]
-        elif self.coordinator.data[self.entity_description.key]["toggleStatus"] == "ON":
-            return "TIMER"
-        elif self.coordinator.data[self.entity_description.key]["switchStatus"] == "ON":
+            return device["modeValue"]
+
+        switch_status = str(device.get("switchStatus", "")).strip().upper()
+        toggle_status = str(device.get("toggleStatus", "")).strip().upper()
+
+        # Prefer explicit power state when available; fall back to toggle for devices
+        # that do not populate switchStatus.
+        if switch_status == "ON":
             return "ON"
+        elif switch_status == "OFF":
+            return "OFF"
+        elif toggle_status == "ON":
+            return "TIMER"
         else:
             return "OFF"
 

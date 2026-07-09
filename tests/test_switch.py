@@ -110,3 +110,26 @@ async def test_switch_turn_off_api_fail(mock_sleep, mock_animate, mock_poll, has
 
     # Check that state was written multiple times (optimistic OFF, then revert to ON)
     assert switch.async_write_ha_state.call_count >= 2
+
+
+def test_switch_uses_toggle_status_fallback(hass: HomeAssistant):
+    """Test ON/OFF state falls back to toggleStatus when switchStatus is empty."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "VF_CONTACT_1": {
+            "name": "VF Contact - Heat Pump",
+            "switchStatus": "",
+            "toggleStatus": "ON",
+        }
+    }
+    description = SwitchEntityDescription(key="VF_CONTACT_1", name="VF Contact - Heat Pump")
+
+    switch = InsnrgPoolSwitch(
+        coordinator,
+        "test@example.com",
+        description,
+        "VF_CONTACT_1",
+        hass,
+    )
+
+    assert switch.is_on
