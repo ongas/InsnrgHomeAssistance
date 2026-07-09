@@ -8,5 +8,5 @@
   "issue_tracker": "https://github.com/ongas/InsnrgHomeAssistance/issues",
   "loggers": ["insnrg"],
   "requirements": [],
-  "version": "1.1.1"
+  "version": "1.1.2"
 }

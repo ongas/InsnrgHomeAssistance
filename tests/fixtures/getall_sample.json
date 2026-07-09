@@ -1,0 +1,43 @@
+[
+  {
+    "cmd": ["MODE"],
+    "name": "Filter Pump",
+    "type": ["SWITCH"],
+    "deviceId": "MODE",
+    "supportedController": ["PowerController", "ToggleController"],
+    "properties": [
+      {"namespace": "Alexa.PowerController", "name": "powerState", "value": "OFF"},
+      {"namespace": "Alexa.ToggleController", "name": "toggleState", "value": "OFF"}
+    ]
+  },
+  {
+    "cmd": [],
+    "name": "Water Thermostat",
+    "type": ["THERMOSTAT", "TEMPERATURE_SENSOR"],
+    "deviceId": "POOL_CONTROL",
+    "supportedController": ["ThermostatController", "TemperatureSensor"],
+    "properties": [
+      {
+        "namespace": "Alexa.ThermostatController",
+        "name": "targetSetpoint",
+        "value": {"value": 8.5, "valueMax": 40, "valueMin": 10, "scale": "CELSIUS", "ggPoolSetTemperature": 10}
+      },
+      {
+        "namespace": "Alexa.TemperatureSensor",
+        "name": "temperature",
+        "value": {"value": 8.5, "ggValue": 8.5, "scale": "CELSIUS"}
+      }
+    ]
+  },
+  {
+    "cmd": ["VF_CONTACT_1"],
+    "name": "VF Contact - Heat Pump",
+    "type": ["SWITCH"],
+    "deviceId": "VF_CONTACT_1",
+    "supportedController": ["PowerController", "ToggleController"],
+    "properties": [
+      {"namespace": "Alexa.PowerController", "name": "powerState", "value": "ON"},
+      {"namespace": "Alexa.ToggleController", "name": "toggleState", "value": "OFF"}
+    ]
+  }
+]

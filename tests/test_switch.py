@@ -131,5 +131,35 @@ def test_switch_uses_toggle_status_fallback(hass: HomeAssistant):
         "VF_CONTACT_1",
         hass,
     )
+    switch.async_write_ha_state = MagicMock()
+
+    assert switch.is_on
+
+
+def test_switch_updates_from_coordinator_refresh(hass: HomeAssistant):
+    """Test switch state is refreshed when coordinator data changes."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "VF_CONTACT_1": {
+            "name": "VF Contact - Heat Pump",
+            "switchStatus": "OFF",
+            "toggleStatus": "",
+        }
+    }
+    description = SwitchEntityDescription(key="VF_CONTACT_1", name="VF Contact - Heat Pump")
+
+    switch = InsnrgPoolSwitch(
+        coordinator,
+        "test@example.com",
+        description,
+        "VF_CONTACT_1",
+        hass,
+    )
+    switch.async_write_ha_state = MagicMock()
+
+    assert not switch.is_on
+
+    coordinator.data["VF_CONTACT_1"]["switchStatus"] = "ON"
+    switch._handle_coordinator_update()
 
     assert switch.is_on
