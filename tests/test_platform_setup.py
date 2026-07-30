@@ -122,9 +122,9 @@ async def test_switch_setup_creates_entities_for_switch_and_toggle_devices(hass)
             "name": "Filter Pump",
             "switchStatus": "OFF",
             "toggleStatus": "OFF",
-            "modeList": ["ON", "OFF", "TIMER"],
         },
         "VF_CONTACT_1": {"name": "VF Contact", "switchStatus": "", "toggleStatus": "ON"},
+        "CUSTOM_BINARY": {"name": "Custom Binary", "switchStatus": "OFF", "toggleStatus": ""},
     }
     hass.data[DOMAIN] = {entry.entry_id: coordinator}
     add_entities = MagicMock()
@@ -133,6 +133,7 @@ async def test_switch_setup_creates_entities_for_switch_and_toggle_devices(hass)
 
     entities = add_entities.call_args[0][0]
     assert len(entities) == 1
+    assert entities[0].entity_description.key == "CUSTOM_BINARY"
 
 
 @pytest.mark.asyncio
@@ -146,7 +147,6 @@ async def test_switch_setup_skips_select_backed_devices(hass):
             "name": "Filter Pump",
             "switchStatus": "OFF",
             "toggleStatus": "OFF",
-            "modeList": ["ON", "OFF", "TIMER"],
         }
     }
     hass.data[DOMAIN] = {entry.entry_id: coordinator}

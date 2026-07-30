@@ -14,6 +14,39 @@ from .const import DOMAIN
 from .polling_mixin import PollingMixin, STARTER_ICON
 _LOGGER = logging.getLogger(__name__)
 
+SELECT_BACKED_DEVICE_IDS = {
+    "SPA",
+    "MODE",
+    "TIMERS",
+    "OUTLET_1",
+    "OUTLET_2",
+    "OUTLET_3",
+    "OUTLET_HUB_3",
+    "OUTLET_HUB_4",
+    "OUTLET_HUB_5",
+    "OUTLET_HUB_6",
+    "VALVE_1",
+    "VALVE_2",
+    "VALVE_3",
+    "VALVE_HUB_1",
+    "VALVE_HUB_2",
+    "VALVE_HUB_3",
+    "VALVE_HUB_4",
+    "LIGHT_MODE",
+    "TIMER_1_STATUS",
+    "TIMER_2_STATUS",
+    "TIMER_3_STATUS",
+    "TIMER_4_STATUS",
+    "TIMER_1_CHL",
+    "TIMER_2_CHL",
+    "TIMER_3_CHL",
+    "TIMER_4_CHL",
+    "VF_CONTACT_1",
+    "VF_CONTACT_HUB_1",
+    "VF_CONTACT_HUB_2",
+    "VF_CONTACT_HUB_3",
+}
+
 
 def _is_on_value(value) -> bool:
     """Normalize API power/toggle values to an on/off bool."""
@@ -29,10 +62,12 @@ def _device_has_switch_state(device_data: dict) -> bool:
     return bool(device_data.get("switchStatus") or device_data.get("toggleStatus"))
 
 
-def _device_is_select_backed(device_data: dict) -> bool:
+def _device_is_select_backed(device_id: str, device_data: dict) -> bool:
     """Return True when the device should be controlled via select instead of switch."""
     mode_list = device_data.get("modeList")
-    return isinstance(mode_list, list) and len(mode_list) > 0
+    return device_id in SELECT_BACKED_DEVICE_IDS or (
+        isinstance(mode_list, list) and len(mode_list) > 0
+    )
 
 
 def _device_state_value(device_data: dict):
@@ -54,7 +89,7 @@ async def async_setup_entry(
     # by checking for non-empty switchStatus property
     for device_id, device_data in coordinator.data.items():
         if isinstance(device_data, dict) and _device_has_switch_state(device_data):
-            if _device_is_select_backed(device_data):
+            if _device_is_select_backed(device_id, device_data):
                 _LOGGER.debug(
                     "Skipping switch entity for %s (%s): mode-capable device is select-backed",
                     device_id,
