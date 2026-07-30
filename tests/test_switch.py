@@ -121,13 +121,15 @@ async def test_switch_turn_off_api_fail(mock_sleep, mock_animate, mock_poll, has
 @patch("custom_components.insnrg.switch.PollingMixin._async_animate_icon", new_callable=AsyncMock)
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_select_proxy_switch_turn_on(mock_sleep, mock_animate, mock_poll, hass: HomeAssistant):
-    """Test select-backed proxy switch maps turn_on to ON command."""
+    """Test select-backed proxy switch maps turn_on to select.select_option ON."""
     coordinator = MagicMock()
     coordinator.data = {
         "MODE": {"name": "Filter Pump", "switchStatus": "OFF", "toggleStatus": "OFF"}
     }
-    coordinator.insnrg_pool = AsyncMock()
-    coordinator.insnrg_pool.turn_the_switch = AsyncMock(return_value=True)
+
+    mock_hass = MagicMock()
+    mock_hass.services.async_call = AsyncMock()
+    mock_hass.states.get = MagicMock(return_value=MagicMock(state="ON"))
 
     description = SwitchEntityDescription(key="MODE", name="Filter Pump Switch")
     switch = InsnrgPoolSelectProxySwitch(
@@ -135,15 +137,21 @@ async def test_select_proxy_switch_turn_on(mock_sleep, mock_animate, mock_poll, 
         "test@example.com",
         description,
         "MODE",
-        hass,
+        mock_hass,
     )
-    switch.hass = hass
+    switch.hass = mock_hass
+    switch._get_linked_select_entity_id = MagicMock(return_value="select.insnrgpool_filter_pump")
     switch.async_write_ha_state = MagicMock()
     mock_poll.return_value = True
 
     await switch.async_turn_on()
 
-    coordinator.insnrg_pool.turn_the_switch.assert_called_once_with("ON", "MODE")
+    mock_hass.services.async_call.assert_called_once_with(
+        "select",
+        "select_option",
+        {"entity_id": "select.insnrgpool_filter_pump", "option": "ON"},
+        blocking=True,
+    )
     mock_poll.assert_called_once()
     assert switch.is_on
 

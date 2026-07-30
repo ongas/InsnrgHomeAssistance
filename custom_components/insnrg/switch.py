@@ -7,6 +7,7 @@ from homeassistant.components.switch import SwitchEntity, SwitchEntityDescriptio
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import InsnrgPoolEntity
@@ -273,11 +274,46 @@ class InsnrgPoolSelectProxySwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         super().__init__(coordinator, email, description)
         self._device_id = device_id
         self.hass = hass
+        self._linked_select_entity_id = None
         self._update_is_on_from_coordinator()
+
+    def _get_linked_select_entity_id(self):
+        """Resolve the select entity_id paired with this proxy switch by unique_id."""
+        if self._linked_select_entity_id:
+            return self._linked_select_entity_id
+
+        try:
+            registry = er.async_get(self.hass)
+        except KeyError:
+            return None
+        for entry in er.async_entries_for_config_entry(registry, self.coordinator.entry.entry_id):
+            if (
+                entry.domain == "select"
+                and entry.unique_id == self.unique_id
+                and entry.disabled_by is None
+            ):
+                self._linked_select_entity_id = entry.entity_id
+                return self._linked_select_entity_id
+
+        return None
+
+    def _get_select_option_from_state_machine(self):
+        """Return select state option from HA state machine."""
+        select_entity_id = self._get_linked_select_entity_id()
+        if not select_entity_id:
+            return None
+
+        state = self.hass.states.get(select_entity_id)
+        if state is None:
+            return None
+
+        return str(state.state).strip().upper()
 
     def _update_is_on_from_coordinator(self) -> None:
         """Sync _attr_is_on from latest coordinator data."""
-        current_option = _device_current_option(self.coordinator.data[self._device_id])
+        current_option = self._get_select_option_from_state_machine()
+        if current_option is None:
+            current_option = _device_current_option(self.coordinator.data[self._device_id])
         self._attr_is_on = current_option == "ON"
 
     def _handle_coordinator_update(self) -> None:
@@ -292,6 +328,13 @@ class InsnrgPoolSelectProxySwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
 
     async def _async_set_target(self, target_mode: str) -> None:
         """Set the proxy switch target mode and wait for coordinator confirmation."""
+        select_entity_id = self._get_linked_select_entity_id()
+        if not select_entity_id:
+            _LOGGER.error("No linked select entity found for proxy switch %s.", self.entity_id)
+            self._update_is_on_from_coordinator()
+            self.async_write_ha_state()
+            return
+
         self._attr_is_on = target_mode == "ON"
         self.async_write_ha_state()
         original_icon = getattr(self, "_attr_icon", None)
@@ -299,19 +342,34 @@ class InsnrgPoolSelectProxySwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         self.async_write_ha_state()
 
         api_call_task = asyncio.create_task(
-            self.coordinator.insnrg_pool.turn_the_switch(target_mode, self._device_id)
+            self.hass.services.async_call(
+                "select",
+                "select_option",
+                {"entity_id": select_entity_id, "option": target_mode},
+                blocking=True,
+            )
         )
         await asyncio.sleep(1.0)
 
         animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
-        success = await api_call_task
+        try:
+            await api_call_task
+            success = True
+        except Exception as err:  # pragma: no cover - defensive for service failures
+            _LOGGER.error(
+                "Failed to call select.select_option for %s -> %s: %s",
+                select_entity_id,
+                target_mode,
+                err,
+            )
+            success = False
 
         if success:
             poll_success = await self._async_poll_for_state_change(
                 self,
                 original_icon,
                 target_mode,
-                lambda: _device_current_option(self.coordinator.data[self._device_id]),
+                lambda: self._get_select_option_from_state_machine(),
                 entity_type="option",
                 animation_task=animation_task,
             )
