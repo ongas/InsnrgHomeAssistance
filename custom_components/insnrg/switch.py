@@ -29,6 +29,12 @@ def _device_has_switch_state(device_data: dict) -> bool:
     return bool(device_data.get("switchStatus") or device_data.get("toggleStatus"))
 
 
+def _device_is_select_backed(device_data: dict) -> bool:
+    """Return True when the device should be controlled via select instead of switch."""
+    mode_list = device_data.get("modeList")
+    return isinstance(mode_list, list) and len(mode_list) > 0
+
+
 def _device_state_value(device_data: dict):
     """Return power state, falling back to toggle state for VF contacts."""
     return device_data.get("switchStatus") or device_data.get("toggleStatus")
@@ -48,6 +54,13 @@ async def async_setup_entry(
     # by checking for non-empty switchStatus property
     for device_id, device_data in coordinator.data.items():
         if isinstance(device_data, dict) and _device_has_switch_state(device_data):
+            if _device_is_select_backed(device_data):
+                _LOGGER.debug(
+                    "Skipping switch entity for %s (%s): mode-capable device is select-backed",
+                    device_id,
+                    device_data.get("name", device_id),
+                )
+                continue
             description = SwitchEntityDescription(
                 key=device_id,
                 name=f'{device_data["name"]} Switch',
