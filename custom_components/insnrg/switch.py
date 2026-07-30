@@ -105,9 +105,9 @@ async def async_setup_entry(
     entities = []
 
     # Dynamically discover all devices that support switching
-    # by checking for non-empty switchStatus property
+    # by checking select-backed capability first, then binary switch/toggle state
     for device_id, device_data in coordinator.data.items():
-        if isinstance(device_data, dict) and _device_has_switch_state(device_data):
+        if isinstance(device_data, dict):
             if _is_proxyable_select_device(device_id, device_data):
                 description = SwitchEntityDescription(
                     key=device_id,
@@ -135,6 +135,10 @@ async def async_setup_entry(
                     device_data.get("name", device_id),
                 )
                 continue
+
+            if not _device_has_switch_state(device_data):
+                continue
+
             description = SwitchEntityDescription(
                 key=device_id,
                 name=f'{device_data["name"]} Switch',
