@@ -6,7 +6,11 @@ from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
 
 from custom_components.insnrg.const import DOMAIN
-from custom_components.insnrg.switch import InsnrgPoolSwitch, async_setup_entry
+from custom_components.insnrg.switch import (
+    InsnrgPoolSelectProxySwitch,
+    InsnrgPoolSwitch,
+    async_setup_entry,
+)
 
 
 @pytest.fixture
@@ -40,12 +44,13 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_coordinator, mock_con
 
     assert async_add_entities.call_count == 1
     entities = async_add_entities.call_args[0][0]
-    assert len(entities) == 1
-    # Check that all entities are InsnrgPoolSwitch instances
-    assert all(isinstance(e, InsnrgPoolSwitch) for e in entities)
+    assert len(entities) == 2
+    # Check that entities include both regular and proxy switch classes
+    assert any(isinstance(e, InsnrgPoolSwitch) for e in entities)
+    assert any(isinstance(e, InsnrgPoolSelectProxySwitch) for e in entities)
     # Check that we have the expected entity names (order doesn't matter)
     entity_names = {e.name for e in entities}
-    assert entity_names == {"InsnrgPool Heater Switch"}
+    assert entity_names == {"InsnrgPool Heater Switch", "InsnrgPool Spa Switch"}
 
 
 @patch("custom_components.insnrg.switch.PollingMixin._async_poll_for_state_change", new_callable=AsyncMock)
@@ -110,6 +115,37 @@ async def test_switch_turn_off_api_fail(mock_sleep, mock_animate, mock_poll, has
 
     # Check that state was written multiple times (optimistic OFF, then revert to ON)
     assert switch.async_write_ha_state.call_count >= 2
+
+
+@patch("custom_components.insnrg.switch.PollingMixin._async_poll_for_state_change", new_callable=AsyncMock)
+@patch("custom_components.insnrg.switch.PollingMixin._async_animate_icon", new_callable=AsyncMock)
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_select_proxy_switch_turn_on(mock_sleep, mock_animate, mock_poll, hass: HomeAssistant):
+    """Test select-backed proxy switch maps turn_on to ON command."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "MODE": {"name": "Filter Pump", "switchStatus": "OFF", "toggleStatus": "OFF"}
+    }
+    coordinator.insnrg_pool = AsyncMock()
+    coordinator.insnrg_pool.turn_the_switch = AsyncMock(return_value=True)
+
+    description = SwitchEntityDescription(key="MODE", name="Filter Pump Switch")
+    switch = InsnrgPoolSelectProxySwitch(
+        coordinator,
+        "test@example.com",
+        description,
+        "MODE",
+        hass,
+    )
+    switch.hass = hass
+    switch.async_write_ha_state = MagicMock()
+    mock_poll.return_value = True
+
+    await switch.async_turn_on()
+
+    coordinator.insnrg_pool.turn_the_switch.assert_called_once_with("ON", "MODE")
+    mock_poll.assert_called_once()
+    assert switch.is_on
 
 
 def test_switch_uses_toggle_status_fallback(hass: HomeAssistant):

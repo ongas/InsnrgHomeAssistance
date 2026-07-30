@@ -70,6 +70,25 @@ def _device_is_select_backed(device_id: str, device_data: dict) -> bool:
     )
 
 
+def _device_current_option(device_data: dict) -> str:
+    """Derive the select-like option from switch/toggle values."""
+    switch_status = str(device_data.get("switchStatus", "")).strip().upper()
+    toggle_status = str(device_data.get("toggleStatus", "")).strip().upper()
+
+    if switch_status == "ON":
+        return "ON"
+    if switch_status == "OFF":
+        return "OFF"
+    if toggle_status == "ON":
+        return "TIMER"
+    return "OFF"
+
+
+def _is_proxyable_select_device(device_id: str, device_data: dict) -> bool:
+    """Return True when a select-backed device can be exposed as a proxy switch."""
+    return _device_is_select_backed(device_id, device_data) and device_id != "LIGHT_MODE"
+
+
 def _device_state_value(device_data: dict):
     """Return power state, falling back to toggle state for VF contacts."""
     return device_data.get("switchStatus") or device_data.get("toggleStatus")
@@ -89,6 +108,26 @@ async def async_setup_entry(
     # by checking for non-empty switchStatus property
     for device_id, device_data in coordinator.data.items():
         if isinstance(device_data, dict) and _device_has_switch_state(device_data):
+            if _is_proxyable_select_device(device_id, device_data):
+                description = SwitchEntityDescription(
+                    key=device_id,
+                    name=f'{device_data["name"]} Switch',
+                )
+                new_switch = InsnrgPoolSelectProxySwitch(
+                    coordinator,
+                    config_entry.data[CONF_EMAIL],
+                    description,
+                    device_id,
+                    hass,
+                )
+                entities.append(new_switch)
+                _LOGGER.debug(
+                    "Created proxy switch entity: %s (%s)",
+                    new_switch.entity_id,
+                    new_switch.name,
+                )
+                continue
+
             if _device_is_select_backed(device_id, device_data):
                 _LOGGER.debug(
                     "Skipping switch entity for %s (%s): mode-capable device is select-backed",
@@ -193,7 +232,7 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
         api_call_task = asyncio.create_task(
             self.coordinator.insnrg_pool.turn_the_switch("OFF", self._device_id)
         )
-        
+
         await asyncio.sleep(1.0) # Delay for 1 second before starting clock animation
 
         animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
@@ -220,3 +259,70 @@ class InsnrgPoolSwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
             # Revert if command failed, get actual state from coordinator
             self._attr_is_on = _is_on_value(_device_state_value(self.coordinator.data[self._device_id]))
             self.async_write_ha_state()
+
+
+class InsnrgPoolSelectProxySwitch(InsnrgPoolEntity, SwitchEntity, PollingMixin):
+    """Switch proxy that controls a select-backed Insnrg device."""
+
+    def __init__(self, coordinator, email, description, device_id, hass):
+        """Initialize select proxy switch."""
+        super().__init__(coordinator, email, description)
+        self._device_id = device_id
+        self.hass = hass
+        self._update_is_on_from_coordinator()
+
+    def _update_is_on_from_coordinator(self) -> None:
+        """Sync _attr_is_on from latest coordinator data."""
+        current_option = _device_current_option(self.coordinator.data[self._device_id])
+        self._attr_is_on = current_option == "ON"
+
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_is_on_from_coordinator()
+        super()._handle_coordinator_update()
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the switch is on."""
+        return self._attr_is_on
+
+    async def _async_set_target(self, target_mode: str) -> None:
+        """Set the proxy switch target mode and wait for coordinator confirmation."""
+        self._attr_is_on = target_mode == "ON"
+        self.async_write_ha_state()
+        original_icon = getattr(self, "_attr_icon", None)
+        self._attr_icon = STARTER_ICON
+        self.async_write_ha_state()
+
+        api_call_task = asyncio.create_task(
+            self.coordinator.insnrg_pool.turn_the_switch(target_mode, self._device_id)
+        )
+        await asyncio.sleep(1.0)
+
+        animation_task = asyncio.create_task(self._async_animate_icon(self, original_icon))
+        success = await api_call_task
+
+        if success:
+            poll_success = await self._async_poll_for_state_change(
+                self,
+                original_icon,
+                target_mode,
+                lambda: _device_current_option(self.coordinator.data[self._device_id]),
+                entity_type="option",
+                animation_task=animation_task,
+            )
+            if not poll_success:
+                self._update_is_on_from_coordinator()
+                self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to set proxy switch %s to %s.", self.entity_id, target_mode)
+            self._update_is_on_from_coordinator()
+            self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Turn proxy switch on by setting select mode to ON."""
+        await self._async_set_target("ON")
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn proxy switch off by setting select mode to OFF."""
+        await self._async_set_target("OFF")
