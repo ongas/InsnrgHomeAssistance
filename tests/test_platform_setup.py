@@ -132,9 +132,9 @@ async def test_switch_setup_creates_entities_for_switch_and_toggle_devices(hass)
     await switch.async_setup_entry(hass, entry, add_entities)
 
     entities = add_entities.call_args[0][0]
-    assert len(entities) == 3
+    assert len(entities) == 2
     entity_keys = {entity.entity_description.key for entity in entities}
-    assert entity_keys == {"MODE", "VF_CONTACT_1", "CUSTOM_BINARY"}
+    assert entity_keys == {"VF_CONTACT_1", "CUSTOM_BINARY"}
 
 
 @pytest.mark.asyncio
@@ -156,5 +156,4 @@ async def test_switch_setup_creates_proxy_for_select_backed_devices(hass):
     await switch.async_setup_entry(hass, entry, add_entities)
 
     entities = add_entities.call_args[0][0]
-    assert len(entities) == 1
-    assert entities[0].entity_description.key == "MODE"
+    assert len(entities) == 0

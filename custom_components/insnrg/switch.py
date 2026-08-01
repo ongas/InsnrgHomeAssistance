@@ -15,6 +15,12 @@ from .const import DOMAIN
 from .polling_mixin import PollingMixin, STARTER_ICON
 _LOGGER = logging.getLogger(__name__)
 
+ALLOWED_PROXY_DEVICE_IDS = {
+    "VALVE_1",
+    "VALVE_2",
+    "VF_CONTACT_1",
+}
+
 SELECT_BACKED_DEVICE_IDS = {
     "SPA",
     "MODE",
@@ -87,7 +93,7 @@ def _device_current_option(device_data: dict) -> str:
 
 def _is_proxyable_select_device(device_id: str, device_data: dict) -> bool:
     """Return True when a select-backed device can be exposed as a proxy switch."""
-    return _device_is_select_backed(device_id, device_data) and device_id != "LIGHT_MODE"
+    return _device_is_select_backed(device_id, device_data) and device_id in ALLOWED_PROXY_DEVICE_IDS
 
 
 def _device_state_value(device_data: dict):
