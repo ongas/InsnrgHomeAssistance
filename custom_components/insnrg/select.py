@@ -100,13 +100,19 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
     def _get_current_option_from_coordinator(self):
         """Helper to get the current option from coordinator data."""
         device = self.coordinator.data[self.entity_description.key]
+        device_id = device.get("deviceId")
         if (
-            device["deviceId"] == "LIGHT_MODE"
+            device_id == "LIGHT_MODE"
         ):
             return device["modeValue"]
 
         switch_status = str(device.get("switchStatus", "")).strip().upper()
         toggle_status = str(device.get("toggleStatus", "")).strip().upper()
+
+        # MODE is the pool filter pump select where TIMER must be surfaced when
+        # timer/toggle is active, even if switchStatus is also ON.
+        if device_id == "MODE" and toggle_status == "ON":
+            return "TIMER"
 
         # Prefer explicit power state when available; fall back to toggle for devices
         # that do not populate switchStatus.

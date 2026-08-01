@@ -14,25 +14,26 @@ def _entry():
 
 
 @pytest.mark.parametrize(
-    ("switch_status", "toggle_status", "expected"),
+    ("device_id", "switch_status", "toggle_status", "expected"),
     [
-        ("ON", "OFF", "ON"),
-        ("OFF", "ON", "OFF"),
-        ("", "ON", "TIMER"),
-        ("", "OFF", "OFF"),
+        ("VF_CONTACT_1", "ON", "OFF", "ON"),
+        ("VF_CONTACT_1", "OFF", "ON", "OFF"),
+        ("VF_CONTACT_1", "", "ON", "TIMER"),
+        ("VF_CONTACT_1", "", "OFF", "OFF"),
+        ("MODE", "ON", "ON", "TIMER"),
     ],
 )
-def test_select_current_option_prefers_switch_status(hass, switch_status, toggle_status, expected):
+def test_select_current_option_prefers_switch_status(hass, device_id, switch_status, toggle_status, expected):
     coordinator = MagicMock()
     coordinator.data = {
-        "VF_CONTACT_1": {
+        device_id: {
             "name": "VF Contact - Heat Pump",
-            "deviceId": "VF_CONTACT_1",
+            "deviceId": device_id,
             "switchStatus": switch_status,
             "toggleStatus": toggle_status,
         }
     }
-    description = SelectEntityDescription(key="VF_CONTACT_1", name="VF Contact - Heat Pump")
+    description = SelectEntityDescription(key=device_id, name="VF Contact - Heat Pump")
 
     with patch("custom_components.insnrg.select.aiohttp_client.async_get_clientsession", return_value=MagicMock()):
         entity = InsnrgPoolSelect(coordinator, hass, _entry(), description)
