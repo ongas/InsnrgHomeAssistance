@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 KEYS_TO_CHECK = [
     "SPA",
     "MODE",
+    "PUMP_SPEED",
     "TIMERS",
     "OUTLET_1",
     "OUTLET_2",
@@ -99,12 +100,12 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
 
     def _get_current_option_from_coordinator(self):
         """Helper to get the current option from coordinator data."""
-        device = self.coordinator.data[self.entity_description.key]
+        device = self.coordinator.data.get(self.entity_description.key)
+        if not isinstance(device, dict):
+            return None
         device_id = device.get("deviceId")
-        if (
-            device_id == "LIGHT_MODE"
-        ):
-            return device["modeValue"]
+        if device_id in ("LIGHT_MODE", "PUMP_SPEED"):
+            return device.get("modeValue") or None
 
         switch_status = str(device.get("switchStatus", "")).strip().upper()
         toggle_status = str(device.get("toggleStatus", "")).strip().upper()
@@ -128,6 +129,10 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
     @property
     def current_option(self):
         """Return the current selected option."""
+        # Pump speed is a reported mode; always reflect the latest discovery
+        # result instead of retaining an optimistic (potentially stale) value.
+        if self.entity_description.key == "PUMP_SPEED":
+            return self._get_current_option_from_coordinator()
         # Always return _attr_current_option for optimistic updates
         return self._attr_current_option
 
@@ -148,6 +153,8 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
             )
             return []
         deviceId = value["deviceId"]
+        if deviceId == "PUMP_SPEED":
+            return value.get("modeList", [])
         timerDevices = [
             "TIMER_1_STATUS",
             "TIMER_2_STATUS",
@@ -172,19 +179,30 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         # Optimistic update
+        device = self.coordinator.data.get(self.entity_description.key)
+        if not isinstance(device, dict) or not device.get("deviceId"):
+            _LOGGER.warning("Cannot select option: device %s is unavailable", self.entity_description.key)
+            return
+        deviceId = device["deviceId"]
+        if deviceId == "PUMP_SPEED" and option not in self.options:
+            _LOGGER.warning("Ignoring unreported pump speed preset %r", option)
+            return
         self._attr_current_option = option
         self.async_write_ha_state()
         original_icon = getattr(self, "_attr_icon", None)  # Capture original icon
         self._attr_icon = STARTER_ICON  # Set starter icon
         self.async_write_ha_state()
 
-        deviceId = self.coordinator.data[self.entity_description.key]["deviceId"]
         if deviceId == "LIGHT_MODE":
             supportCmd = self.coordinator.data[self.entity_description.key][
                 "supportCmd"
             ]
             api_call_task = asyncio.create_task(
                 self.insnrg_pool.change_light_mode(option, supportCmd)
+            )
+        elif deviceId == "PUMP_SPEED":
+            api_call_task = asyncio.create_task(
+                self.insnrg_pool.set_pump_value(option, deviceId)
             )
         else:
             _LOGGER.info({option: option, deviceId: deviceId})

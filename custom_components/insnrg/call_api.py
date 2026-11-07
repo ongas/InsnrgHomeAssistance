@@ -251,3 +251,26 @@ class InsnrgPool:
         except Exception as e:
             _LOGGER.error(f"Error turning the switch: {str(e)}")
             return False
+
+    async def set_pump_value(self, pump_value, deviceId):
+        """Set a pump speed preset reported by the device."""
+        login_data = {"userName": self._userName, "password": self._password}
+        try:
+            resp = await self._session.post(self._url_login, json=login_data)
+            if resp.status != 200:
+                raise InsnrgPoolError(resp.status, "Login failed.")
+            data = await resp.json(content_type=None)
+            body = {
+                "cmd": "setPumpValue",
+                "pumpValue": pump_value,
+                "deviceId": deviceId,
+                "userId": data["user"]["userId"],
+            }
+            headers = {"Authorization": "Bearer {}".format(data["auth"]["idToken"])}
+            response = await self._session.post(CMD_URL, headers=headers, json=body)
+            if response.status == 200:
+                return True
+            raise InsnrgPoolError(response.status, "Failed to set pump speed")
+        except Exception as e:
+            _LOGGER.error("Error setting pump speed: %s", e)
+            return False

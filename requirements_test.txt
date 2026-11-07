@@ -1,3 +1,4 @@
 pytest
 pytest-homeassistant-custom-component
 ruff
+pytest-bdd==8.1.0
