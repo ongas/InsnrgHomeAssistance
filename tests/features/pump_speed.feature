@@ -4,22 +4,29 @@ Feature: Pump speed presets
   So that I can support solar-aware operation
 
   @status-completed
-  Scenario: Discover pump speed after select platform setup
+  Scenario: Pump speed entities exist before data is reported
     Given select platform starts before pump speed is reported
-    When discovery reports pump speed presets "Default,1,2" and current value "1"
-    Then exactly one pump speed select is added with reported options and state
+    When the pump speed data remains absent
+    Then one unavailable pump speed select and readable status report absent data
 
   @status-completed
-  Scenario: Repeated pump discovery does not duplicate the selector
+  Scenario: Discovery updates the stable pump speed selector
     Given select platform starts before pump speed is reported
     When discovery reports pump speed presets "Default,1,2" and current value "1" repeatedly
     Then exactly one pump speed select is added with reported options and state
+    And pump speed status reports available data
 
   @status-completed
-  Scenario: Unloading select platform prevents late pump discovery
+  Scenario: Failed coordinator refresh has an accurate status
+    Given select platform starts before pump speed is reported
+    When the coordinator refresh fails
+    Then pump speed status reports an update failure
+
+  @status-completed
+  Scenario: Unloading select platform has no discovery listener to leak
     Given select platform starts before pump speed is reported
     When the select platform unloads before pump speed discovery
-    Then later pump discovery adds no pump speed select
+    Then the stable pump speed select was created without a late discovery listener
 
   @status-completed
   Scenario: Show discovered pump speed presets and reported state
@@ -55,3 +62,11 @@ Feature: Pump speed presets
     When the pump speed device disappears
     Then its current option is unavailable
     And no pump speed command is sent
+    And no switch command is sent
+
+  @status-completed
+  Scenario: Mismatched pump device identifier cannot expose or control another device
+    Given pump speed data is keyed as pump speed but reports device identifier "MODE"
+    When I select pump speed "ON"
+    Then the pump speed selector remains unavailable without guessed options or state
+    And no pump or switch command is sent

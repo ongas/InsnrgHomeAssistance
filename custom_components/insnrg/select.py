@@ -69,11 +69,11 @@ async def async_setup_entry(
         _LOGGER.info(f"Insnrg select setup: coordinator.data keys: {device_keys}")
     select_descriptions = []
     for key in KEYS_TO_CHECK:
-        if key in getattr(coordinator, "data", {}):
+        if key in getattr(coordinator, "data", {}) or key == "PUMP_SPEED":
             select_descriptions.append(
                 SelectEntityDescription(
                     key=key,
-                    name=coordinator.data[key]["name"],
+                    name=coordinator.data[key]["name"] if key in coordinator.data else "Pump Speed",
                 )
             )
     entities = [
@@ -81,29 +81,6 @@ async def async_setup_entry(
         for description in select_descriptions
     ]
     async_add_entities(entities, False)
-    if "PUMP_SPEED" not in getattr(coordinator, "data", {}):
-        pump_added = False
-        active = True
-
-        def add_late_pump_speed() -> None:
-            nonlocal pump_added
-            if not active or pump_added or "PUMP_SPEED" not in coordinator.data:
-                return
-            device = coordinator.data["PUMP_SPEED"]
-            if not isinstance(device, dict) or device.get("deviceId") != "PUMP_SPEED":
-                return
-            pump_added = True
-            description = SelectEntityDescription(key="PUMP_SPEED", name=device.get("name", "Pump Speed"))
-            async_add_entities([InsnrgPoolSelect(coordinator, hass, config_entry, description)], False)
-
-        remove_listener = coordinator.async_add_listener(add_late_pump_speed)
-
-        def cleanup_late_pump_listener() -> None:
-            nonlocal active
-            active = False
-            remove_listener()
-
-        config_entry.async_on_unload(cleanup_late_pump_listener)
 
 
 class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
@@ -127,6 +104,8 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
         if not isinstance(device, dict):
             return None
         device_id = device.get("deviceId")
+        if self.entity_description.key == "PUMP_SPEED" and device_id != "PUMP_SPEED":
+            return None
         if device_id in ("LIGHT_MODE", "PUMP_SPEED"):
             return device.get("modeValue") or None
 
@@ -153,9 +132,8 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
     def available(self):
         """A pump-speed select is unavailable while its device is not reported."""
         if self.entity_description.key == "PUMP_SPEED":
-            return super().available and isinstance(
-                self.coordinator.data.get("PUMP_SPEED"), dict
-            )
+            device = self.coordinator.data.get("PUMP_SPEED")
+            return super().available and isinstance(device, dict) and device.get("deviceId") == "PUMP_SPEED"
         return super().available
 
     @property
@@ -173,6 +151,10 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
         """Return the list of available options."""
         key = self.entity_description.key
         available_keys = list(self.coordinator.data.keys())
+        if key == "PUMP_SPEED":
+            device = self.coordinator.data.get(key)
+            if not isinstance(device, dict) or device.get("deviceId") != "PUMP_SPEED":
+                return []
         if key not in self.coordinator.data:
             _LOGGER.error(
                 f"Key '{key}' not found in coordinator.data. Available keys: {available_keys}"
@@ -216,6 +198,9 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
             _LOGGER.warning("Cannot select option: device %s is unavailable", self.entity_description.key)
             return
         deviceId = device["deviceId"]
+        if self.entity_description.key == "PUMP_SPEED" and deviceId != "PUMP_SPEED":
+            _LOGGER.warning("Cannot select option: pump speed device is not reported")
+            return
         if deviceId == "PUMP_SPEED" and option not in self.options:
             _LOGGER.warning("Ignoring unreported pump speed preset %r", option)
             return

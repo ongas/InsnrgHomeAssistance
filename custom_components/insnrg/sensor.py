@@ -21,6 +21,12 @@ TEMP_SENSOR_DESCRIPTION = SensorEntityDescription(
     icon="mdi:pool-thermometer",
 )
 
+PUMP_SPEED_STATUS_DESCRIPTION = SensorEntityDescription(
+    key="PUMP_SPEED_STATUS",
+    name="Pump Speed Status",
+    icon="mdi:pump",
+)
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -49,7 +55,31 @@ async def async_setup_entry(
         for description in sersor_descriptions if description.key == TEMP_SENSOR_KEY
     ]
 
+    entities.append(InsnrgPumpSpeedStatusSensor(coordinator, PUMP_SPEED_STATUS_DESCRIPTION))
+
     async_add_entities(entities + temp_entities, False)
+
+
+class InsnrgPumpSpeedStatusSensor(InsnrgPoolEntity, SensorEntity):
+    """Always-readable status for reported pump-speed data."""
+
+    def __init__(self, coordinator, description):
+        super().__init__(coordinator, None, description)
+
+    @property
+    def available(self):
+        """Keep diagnostics visible even when a coordinator refresh fails."""
+        return True
+
+    @property
+    def native_value(self):
+        """Describe data availability without inferring pump operation."""
+        if not self.coordinator.last_update_success:
+            return "Unable to refresh Insnrg data"
+        device = self.coordinator.data.get("PUMP_SPEED")
+        if isinstance(device, dict) and device.get("deviceId") == "PUMP_SPEED":
+            return "Pump speed data available"
+        return "Insnrg is not currently reporting pump-speed data"
 
 class InsnrgPoolSensor(InsnrgPoolEntity, SensorEntity):
     """Sensor representing Insnrg Pool data."""

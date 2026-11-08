@@ -35,7 +35,11 @@ async def test_select_setup_creates_expected_entities(hass):
         await select.async_setup_entry(hass, entry, add_entities)
 
     entities = add_entities.call_args[0][0]
-    assert len(entities) == 2
+    assert len(entities) == 3
+    pump = next(entity for entity in entities if entity.entity_description.key == "PUMP_SPEED")
+    assert pump.unique_id == "insnrg_PUMP_SPEED"
+    assert pump.available is False
+    assert pump.options == []
 
 
 @pytest.mark.asyncio
@@ -108,7 +112,9 @@ async def test_sensor_setup_creates_pool_temp_and_ph_sensor(hass):
     await sensor.async_setup_entry(hass, entry, add_entities)
 
     entities = add_entities.call_args[0][0]
-    assert len(entities) == 2
+    assert len(entities) == 3
+    status = next(entity for entity in entities if entity.entity_description.key == "PUMP_SPEED_STATUS")
+    assert status.unique_id == "insnrg_PUMP_SPEED_STATUS"
 
 
 @pytest.mark.asyncio
