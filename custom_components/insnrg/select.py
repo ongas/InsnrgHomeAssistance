@@ -81,6 +81,29 @@ async def async_setup_entry(
         for description in select_descriptions
     ]
     async_add_entities(entities, False)
+    if "PUMP_SPEED" not in getattr(coordinator, "data", {}):
+        pump_added = False
+        active = True
+
+        def add_late_pump_speed() -> None:
+            nonlocal pump_added
+            if not active or pump_added or "PUMP_SPEED" not in coordinator.data:
+                return
+            device = coordinator.data["PUMP_SPEED"]
+            if not isinstance(device, dict) or device.get("deviceId") != "PUMP_SPEED":
+                return
+            pump_added = True
+            description = SelectEntityDescription(key="PUMP_SPEED", name=device.get("name", "Pump Speed"))
+            async_add_entities([InsnrgPoolSelect(coordinator, hass, config_entry, description)], False)
+
+        remove_listener = coordinator.async_add_listener(add_late_pump_speed)
+
+        def cleanup_late_pump_listener() -> None:
+            nonlocal active
+            active = False
+            remove_listener()
+
+        config_entry.async_on_unload(cleanup_late_pump_listener)
 
 
 class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
@@ -125,6 +148,15 @@ class InsnrgPoolSelect(InsnrgPoolEntity, SelectEntity, PollingMixin):
             return "TIMER"
         else:
             return "OFF"
+
+    @property
+    def available(self):
+        """A pump-speed select is unavailable while its device is not reported."""
+        if self.entity_description.key == "PUMP_SPEED":
+            return super().available and isinstance(
+                self.coordinator.data.get("PUMP_SPEED"), dict
+            )
+        return super().available
 
     @property
     def current_option(self):

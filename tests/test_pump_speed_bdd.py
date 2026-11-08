@@ -17,6 +17,68 @@ def pump_context():
     return {}
 
 
+@given("select platform starts before pump speed is reported")
+def select_platform_without_pump(pump_context):
+    from custom_components.insnrg.select import async_setup_entry
+
+    coordinator = MagicMock()
+    coordinator.data = {}
+    listeners = []
+    coordinator.async_add_listener = MagicMock(side_effect=lambda callback: (listeners.append(callback) or (lambda: listeners.remove(callback))))
+    entry = MagicMock(data={CONF_EMAIL: "user", CONF_PASSWORD: "password"})
+    unload_callbacks = []
+    entry.async_on_unload = MagicMock(side_effect=unload_callbacks.append)
+    added = []
+    hass = MagicMock()
+    from custom_components.insnrg.const import DOMAIN
+    hass.data = {DOMAIN: {entry.entry_id: coordinator}}
+    with patch("custom_components.insnrg.select.aiohttp_client.async_get_clientsession", return_value=MagicMock()):
+        asyncio.run(async_setup_entry(hass, entry, lambda entities, update: added.extend(entities)))
+    pump_context.update(coordinator=coordinator, entry=entry, listeners=listeners, unload_callbacks=unload_callbacks, added=added)
+
+
+@when(parsers.parse('discovery reports pump speed presets "{presets}" and current value "{current}"'))
+def report_late_pump(pump_context, presets, current):
+    pump_context["coordinator"].data["PUMP_SPEED"] = {
+        "name": "Pump Speed", "deviceId": "PUMP_SPEED", "modeList": presets.split(","), "modeValue": current,
+    }
+    with patch("custom_components.insnrg.select.aiohttp_client.async_get_clientsession", return_value=MagicMock()):
+        for listener in list(pump_context["listeners"]):
+            listener()
+
+
+@when(parsers.parse('discovery reports pump speed presets "{presets}" and current value "{current}" repeatedly'))
+def report_late_pump_repeated(pump_context, presets, current):
+    report_late_pump(pump_context, presets, current)
+    with patch("custom_components.insnrg.select.aiohttp_client.async_get_clientsession", return_value=MagicMock()):
+        for listener in list(pump_context["listeners"]):
+            listener()
+
+
+@then("exactly one pump speed select is added with reported options and state")
+def one_late_pump_select(pump_context):
+    entities = [entity for entity in pump_context["added"] if entity.entity_description.key == "PUMP_SPEED"]
+    assert len(entities) == 1
+    assert entities[0].options == ["Default", "1", "2"]
+    assert entities[0].current_option == "1"
+
+
+@when("the select platform unloads before pump speed discovery")
+def unload_select_platform(pump_context):
+    for callback in pump_context["unload_callbacks"]:
+        callback()
+    pump_context["coordinator"].data["PUMP_SPEED"] = {
+        "name": "Pump Speed", "deviceId": "PUMP_SPEED", "modeList": ["Default", "1"], "modeValue": "1",
+    }
+    for listener in list(pump_context["listeners"]):
+        listener()
+
+
+@then("later pump discovery adds no pump speed select")
+def no_select_after_unload(pump_context):
+    assert not [entity for entity in pump_context["added"] if entity.entity_description.key == "PUMP_SPEED"]
+
+
 @given(parsers.parse('a discovered pump speed device with reported presets "{presets}" and current value "{current}"'))
 def discovered_pump(pump_context, presets, current):
     mode_list = presets.split(",")
@@ -145,6 +207,7 @@ def device_disappears(pump_context):
 @then("its current option is unavailable")
 def unavailable_current_option(pump_context):
     assert pump_context["entity"].current_option is None
+    assert pump_context["entity"].available is False
 
 
 @then("no pump speed command is sent")

@@ -4,6 +4,24 @@ Feature: Pump speed presets
   So that I can support solar-aware operation
 
   @status-completed
+  Scenario: Discover pump speed after select platform setup
+    Given select platform starts before pump speed is reported
+    When discovery reports pump speed presets "Default,1,2" and current value "1"
+    Then exactly one pump speed select is added with reported options and state
+
+  @status-completed
+  Scenario: Repeated pump discovery does not duplicate the selector
+    Given select platform starts before pump speed is reported
+    When discovery reports pump speed presets "Default,1,2" and current value "1" repeatedly
+    Then exactly one pump speed select is added with reported options and state
+
+  @status-completed
+  Scenario: Unloading select platform prevents late pump discovery
+    Given select platform starts before pump speed is reported
+    When the select platform unloads before pump speed discovery
+    Then later pump discovery adds no pump speed select
+
+  @status-completed
   Scenario: Show discovered pump speed presets and reported state
     Given a discovered pump speed device with reported presets "Default,1,2,3,4" and current value "Default"
     When the pump speed select is initialized
